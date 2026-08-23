@@ -1,8 +1,7 @@
 
-
-from dependencies import AuthServiceDep, CurrentUserDep
 from fastapi import APIRouter, Cookie, HTTPException, Response, status
-from schemas import (
+from src.dependencies import AuthServiceDep, CurrentUserDep
+from src.schemas import (
     JWTTokenPairResponseSchema,
     UserCreateSchema,
     UserLoginSchema,

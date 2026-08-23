@@ -1,26 +1,26 @@
 
-from exceptions import (
+from src.exceptions import (
     EmailAlreadyExistsError,
     InvalidPasswordError,
     InvalidTokenTypeError,
     UsernameAlreadyExistsError,
     UserNotFoundError,
 )
-from schemas import (
+from src.schemas import (
     JWTTokenPairResponseSchema,
     UserCreateSchema,
     UserLoginSchema,
     UserReadSchema,
     UserUpdateSchema,
 )
-from security import (
+from src.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
     hash_password,
     verify_password,
 )
-from unitofwork import UnitOfWork
+from src.unitofwork import UnitOfWork
 
 
 class AuthService:
@@ -58,7 +58,7 @@ class AuthService:
                     raise UsernameAlreadyExistsError()
 
             if current_user.email != data.email:
-                user = await self.uow.user_repo.get_by_email(data.email)
+                user = await self.uow.user_repo.get_user_by_email(data.email)
                 if user is not None:
                     raise EmailAlreadyExistsError()
 

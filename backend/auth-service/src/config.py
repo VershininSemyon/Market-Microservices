@@ -1,5 +1,4 @@
 
-
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,15 +13,15 @@ class CorsSettings(BaseModel):
 
 
 class PostgresSettings(BaseModel):
-    POSTGRES_DB_NAME: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_HOST: str = 'postgres'
-    POSTGRES_PORT: int = 5432
+    AUTH_SERVICE_POSTGRES_DB_NAME: str
+    AUTH_SERVICE_POSTGRES_USER: str
+    AUTH_SERVICE_POSTGRES_PASSWORD: str
+    AUTH_SERVICE_POSTGRES_HOST: str = 'postgres'
+    AUTH_SERVICE_POSTGRES_PORT: int = 5432
 
     @property
     def database_url(self) -> str:
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB_NAME}"
+        return f"postgresql+asyncpg://{self.AUTH_SERVICE_POSTGRES_USER}:{self.AUTH_SERVICE_POSTGRES_PASSWORD}@{self.AUTH_SERVICE_POSTGRES_HOST}:{self.AUTH_SERVICE_POSTGRES_PORT}/{self.AUTH_SERVICE_POSTGRES_DB_NAME}"
 
 
 class JwtSettings(BaseModel):
@@ -38,22 +37,12 @@ class PasswordSettings(BaseModel):
     PASSWORD_SALT: str
 
 
-class RedisSettings(BaseModel):
-    REDIS_PASSWORD: str
-    REDIS_PORT: int = 6379
-
-    @property
-    def redis_url(self) -> str:
-        return f"redis://:{self.REDIS_PASSWORD}@redis:{self.REDIS_PORT}/0"
-
-
 class Settings(
     UvicornSettings,
     CorsSettings,
     PostgresSettings,
     JwtSettings,
     PasswordSettings,
-    RedisSettings,
     BaseSettings
 ):
     model_config = SettingsConfigDict(

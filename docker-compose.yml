@@ -1,23 +1,24 @@
 
-
 services:
   auth-backend:
     build:
-      context: ./backend
+      context: ./backend/auth-service
+      dockerfile: dockerfile
     container_name: auth-backend
     restart: always
     env_file:
       - .env
+    expose:
+      - "8001"
     networks:
       - app_net
-    ports:
-      - "8000:8000"
     depends_on:
-      - postgres
+      auth-postgres:
+        condition: service_healthy
 
-  nginx:
+  api-gateway:
     image: nginx:1.27-alpine
-    container_name: nginx
+    container_name: api-gateway
     restart: always
     ports:
       - "80:80"
@@ -25,58 +26,40 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/logs:/var/log/nginx
     depends_on:
-      - backend
+      - auth-backend
     networks:
       - app_net
 
-  postgres:
+  auth-postgres:
     image: postgres:17-alpine
-    container_name: pg_db
+    container_name: auth-postgres
+    restart: always
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - auth-postgres-data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=${POSTGRES_DB_NAME}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTH_SERVICE_POSTGRES_DB_NAME}
+      POSTGRES_USER: ${AUTH_SERVICE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_SERVICE_POSTGRES_PASSWORD}
     networks:
       - app_net
     ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+      - "${AUTH_SERVICE_POSTGRES_PORT}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_SERVICE_POSTGRES_USER} -d ${AUTH_SERVICE_POSTGRES_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:8.0-alpine
-    container_name: redis_database
-    networks:
-      - app_net
-    volumes:
-      - redis-data:/data
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
-    ports:
-      - "${REDIS_PORT}:${REDIS_PORT}"
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-  
   adminer:
     image: adminer:4.8.1
     container_name: adminer
     ports:
       - "8080:8080"
-    links:
-      - "postgres:db"
     networks:
       - app_net
     depends_on:
-      - postgres
+      auth-postgres:
+        condition: service_healthy
 
   redis_monitoring:
     image: redis/redisinsight:3.0.3
@@ -84,18 +67,11 @@ services:
     restart: always
     ports:
       - "5540:5540"
-    environment:
-      - REDISINSIGHT_REDIS_URLS=redis://:${REDIS_PASSWORD}@redis:6379
     networks:
       - app_net
-    depends_on:
-      - redis
-
 
 volumes:
-  postgres-data:
-  redis-data:
-
+  auth-postgres-data:
 
 networks:
   app_net:

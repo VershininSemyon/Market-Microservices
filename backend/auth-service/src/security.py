@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from config import settings
-from exceptions import InvalidTokenError, TokenExpiredError
+from src.config import settings
+from src.exceptions import InvalidTokenError, TokenExpiredError
 
 
 def _create_token(data: dict, token_type: str, lifetime: timedelta) -> str:

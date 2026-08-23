@@ -1,7 +1,7 @@
 
-from models import UserORM
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.models import UserORM
 
 
 class UserRepository:

@@ -2,9 +2,9 @@
 import uuid
 from datetime import datetime
 
-from database import Base
 from sqlalchemy import Boolean, DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
+from src.database import Base
 
 
 class UserORM(Base):
