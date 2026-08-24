@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Cookie, HTTPException, Response, status
+from fastapi import APIRouter, Body, HTTPException, status
 
 from src.dependencies import AuthServiceDep, CurrentUserDep
 from src.schemas import (
@@ -20,24 +20,9 @@ auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 )
 async def authenticate(
     login_data: UserLoginSchema,
-    auth_service: AuthServiceDep,
-    response: Response
+    auth_service: AuthServiceDep
 ):
     token_data = await auth_service.get_tokens(login_data)
-
-    response.set_cookie(
-        key="access_token",
-        value=token_data.access,
-        httponly=True,
-        samesite="lax"
-    )
-
-    response.set_cookie(
-        key="refresh_token",
-        value=token_data.refresh,
-        httponly=True,
-        samesite="lax",
-    )
 
     return token_data
 
@@ -48,8 +33,7 @@ async def authenticate(
 )
 def refresh_token(
     auth_service: AuthServiceDep,
-    response: Response,
-    refresh_token: str | None = Cookie(default=None),
+    refresh_token: str | None = Body(default=None),
 ):
     if not refresh_token:
         raise HTTPException(
@@ -58,19 +42,13 @@ def refresh_token(
         )
 
     access_token = auth_service.refresh_token(refresh_token)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        samesite="lax"
-    )
 
     return {
         "access": access_token
     }
 
 
-user_router = APIRouter(prefix="/users", tags=["Users"])
+user_router = APIRouter(prefix="/auth/users", tags=["Users"])
 
 @user_router.post(
     "/",
@@ -103,11 +81,8 @@ async def get_me(
 async def delete_me(
     current_user: CurrentUserDep,
     auth_service: AuthServiceDep,
-    response: Response
 ):
     await auth_service.delete_user(current_user.id)
-    response.delete_cookie(key="access_token")
-    response.delete_cookie(key="refresh_token")
 
 
 @user_router.put(

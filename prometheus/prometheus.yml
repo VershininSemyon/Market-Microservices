@@ -5,8 +5,18 @@ global:
 
 
 scrape_configs:
-  - job_name: 'fastapi'
+  - job_name: 'prometheus'
     static_configs:
-      - targets: ['backend:8000']
-    metrics_path: /metrics
+      - targets: ['localhost:9090']
+
+  - job_name: 'fastapi-services'
+    metrics_path: /api/metrics 
     scrape_interval: 10s
+    static_configs:
+      - targets: ['auth-backend:8001']
+        labels:
+          service: 'auth-service'
+
+      - targets: ['products-backend:8002']
+        labels:
+          service: 'products-service'

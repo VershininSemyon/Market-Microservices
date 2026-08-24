@@ -2,15 +2,12 @@
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from src.api import auth_router, user_router
 from src.config import settings
 from src.database import engine
-from src.exceptions import AuthError
 
 
 @asynccontextmanager
@@ -22,9 +19,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     lifespan=lifespan,
     root_path='/api',
-    docs_url="/auth/docs",
-    redoc_url="/auth/redoc",
-    openapi_url="/auth/openapi.json",
+    docs_url="/products/docs",
+    redoc_url="/products/redoc",
+    openapi_url="/products/openapi.json",
 )
 
 if settings.CORS_ORIGINS:
@@ -36,18 +33,8 @@ if settings.CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-app.include_router(user_router)
-app.include_router(auth_router)
 
 Instrumentator().instrument(app).expose(app)
-
-
-@app.exception_handler(AuthError)
-async def app_exception_handler(request: Request, exc: AuthError):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
-    )
 
 
 if __name__ == "__main__":

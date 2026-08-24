@@ -15,6 +15,22 @@ services:
     depends_on:
       auth-postgres:
         condition: service_healthy
+    
+  products-backend:
+    build:
+      context: ./backend/products-service
+      dockerfile: dockerfile
+    container_name: products-backend
+    restart: always
+    env_file:
+      - .env
+    expose:
+      - "8002"
+    networks:
+      - app_net
+    depends_on:
+      products-postgres:
+        condition: service_healthy
 
   api-gateway:
     image: nginx:1.27-alpine
@@ -46,6 +62,26 @@ services:
       - "${AUTH_SERVICE_POSTGRES_PORT}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${AUTH_SERVICE_POSTGRES_USER} -d ${AUTH_SERVICE_POSTGRES_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  products-postgres:
+    image: postgres:17-alpine
+    container_name: products-postgres
+    restart: always
+    volumes:
+      - products-postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${PRODUCTS_SERVICE_POSTGRES_DB_NAME}
+      POSTGRES_USER: ${PRODUCTS_SERVICE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PRODUCTS_SERVICE_POSTGRES_PASSWORD}
+    networks:
+      - app_net
+    ports:
+      - "${PRODUCTS_SERVICE_POSTGRES_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PRODUCTS_SERVICE_POSTGRES_USER} -d ${PRODUCTS_SERVICE_POSTGRES_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -87,7 +123,8 @@ services:
     networks:
       - app_net
     depends_on:
-      - backend
+      - auth-backend
+      - products-backend
 
   grafana:
     image: grafana/grafana:10.4.2
@@ -109,6 +146,8 @@ services:
 
 volumes:
   auth-postgres-data:
+  products-postgres-data:
+
   prometheus-data:
   grafana-data:
 
