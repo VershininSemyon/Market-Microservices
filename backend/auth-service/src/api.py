@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, Cookie, HTTPException, Response, status
+
 from src.dependencies import AuthServiceDep, CurrentUserDep
 from src.schemas import (
     JWTTokenPairResponseSchema,

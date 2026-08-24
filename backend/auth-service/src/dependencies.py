@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from src.database import async_session_factory
 from src.schemas import UserReadSchema
 from src.services import AuthService

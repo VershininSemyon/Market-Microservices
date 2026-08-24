@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
+
 from src.config import settings
 from src.exceptions import InvalidTokenError, TokenExpiredError
 
