@@ -24,10 +24,21 @@ class PostgresSettings(BaseModel):
         return f"postgresql+asyncpg://{self.PRODUCTS_SERVICE_POSTGRES_USER}:{self.PRODUCTS_SERVICE_POSTGRES_PASSWORD}@{self.PRODUCTS_SERVICE_POSTGRES_HOST}:{self.PRODUCTS_SERVICE_POSTGRES_PORT}/{self.PRODUCTS_SERVICE_POSTGRES_DB_NAME}"
 
 
+class ElasticSearchSettings(BaseModel):
+    PRODUCTS_INDEX: str = "products-index"
+
+
+class JwtSettings(BaseModel):
+    JWT_ALGORITHM: str = 'RS256'
+    JWT_PUBLIC_KEY: str
+
+
 class Settings(
     UvicornSettings,
     CorsSettings,
     PostgresSettings,
+    ElasticSearchSettings,
+    JwtSettings,
     BaseSettings
 ):
     model_config = SettingsConfigDict(

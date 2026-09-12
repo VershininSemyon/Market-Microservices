@@ -80,7 +80,8 @@ class AuthService:
         user_data = {
             "id": str(user.id),
             "username": user.username,
-            "email": user.email
+            "email": user.email,
+            "is_admin": user.is_admin
         }
 
         return JWTTokenPairResponseSchema.model_validate({
@@ -97,7 +98,8 @@ class AuthService:
         user_data = {
             "id": data['id'],
             "username": data['username'],
-            "email": data['email']
+            "email": data['email'],
+            "is_admin": data['is_admin']
         }
 
         access = create_access_token(user_data)
