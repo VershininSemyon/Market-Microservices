@@ -11,12 +11,15 @@ from src.api import auth_router, user_router
 from src.config import settings
 from src.database import engine
 from src.exceptions import AuthError
+from src.producer import rabbitmq_producer
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await rabbitmq_producer.connect()
     yield
     await engine.dispose()
+    await rabbitmq_producer.close()
 
 
 app = FastAPI(

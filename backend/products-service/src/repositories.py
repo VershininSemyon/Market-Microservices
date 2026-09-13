@@ -63,8 +63,7 @@ class ProductRepository:
         return result.scalar_one_or_none()
 
     async def delete_product(self, product_id) -> None:
-        stmt = delete(ProductORM).where(ProductORM.id == product_id)
-        await self.session.execute(stmt)
+        await self.update_product(product_id, {"is_active": False})
 
     async def get_product_by_name(self, name: str) -> ProductORM:
         stmt = select(ProductORM).where(ProductORM.name == name)

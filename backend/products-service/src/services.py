@@ -1,8 +1,10 @@
 
+from uuid import UUID
+
 from src.exceptions import ProductAlreadyExistsError, ProductNotFoundError
-from src.schemas import ProductCreateSchema, ProductReadSchema, ProductUpdateSchema, ProductQueryParams
+from src.schemas import ProductCreateSchema, ProductQueryParams, ProductReadSchema, ProductUpdateSchema
+from src.search import delete_product_index, index_product, search_product
 from src.unitofwork import UnitOfWork
-from src.search import index_product, delete_product_index, search_product
 
 
 class ProductService:
@@ -40,3 +42,31 @@ class ProductService:
 
         return [ProductReadSchema.model_validate(product) for product in products]
 
+    async def delete_product(self, product_id: UUID) -> None:
+        async with self.uow:
+            await self.uow.product_repo.delete_product(product_id)
+            await self.uow.commit()
+
+        await delete_product_index(product_id)
+
+    async def get_product_by_id(self, product_id: UUID) -> ProductReadSchema:
+        async with self.uow:
+            product = await self.uow.product_repo.get_product_by_id(product_id)
+            if not product:
+                raise ProductNotFoundError()
+
+        return ProductReadSchema.model_validate(product)
+
+    async def update_product(self, product_id: UUID, data: ProductUpdateSchema) -> ProductReadSchema:
+        async with self.uow:
+            product_by_name = await self.uow.product_repo.get_product_by_name(data.name)
+            if product_by_name and product_by_name.id != product_id:
+                raise ProductAlreadyExistsError()
+
+            product = await self.uow.product_repo.update_product(product_id, data.model_dump())
+            if not product:
+                raise ProductNotFoundError()
+            await self.uow.commit()
+
+        await index_product(product.id, product.name, product.description)
+        return ProductReadSchema.model_validate(product)

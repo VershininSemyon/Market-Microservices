@@ -6,6 +6,7 @@ from src.exceptions import (
     UsernameAlreadyExistsError,
     UserNotFoundError,
 )
+from src.producer import rabbitmq_producer
 from src.schemas import (
     JWTTokenPairResponseSchema,
     UserCreateSchema,
@@ -43,6 +44,10 @@ class AuthService:
             created_user = await self.uow.user_repo.create_user(user_dict)
             await self.uow.commit()
 
+        await rabbitmq_producer.publish_user_registered({
+            "username": created_user.username,
+            "email": created_user.email
+        })
         return UserReadSchema.model_validate(created_user)
 
     async def delete_user(self, user_id: str) -> None:

@@ -25,7 +25,16 @@ class PostgresSettings(BaseModel):
 
 
 class ElasticSearchSettings(BaseModel):
+    ELASTIC_USER: str
+    ELASTIC_PASSWORD: str
+    ELASTIC_HOST: str = "localhost"
+    ELASTIC_PORT: int = 9200
+
     PRODUCTS_INDEX: str = "products-index"
+
+    @property
+    def elastic_url(self) -> str:
+        return f"http://{self.ELASTIC_USER}:{self.ELASTIC_PASSWORD}@{self.ELASTIC_HOST}:{self.ELASTIC_PORT}"
 
 
 class JwtSettings(BaseModel):

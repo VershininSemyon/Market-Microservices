@@ -24,6 +24,20 @@ class PostgresSettings(BaseModel):
         return f"postgresql+asyncpg://{self.AUTH_SERVICE_POSTGRES_USER}:{self.AUTH_SERVICE_POSTGRES_PASSWORD}@{self.AUTH_SERVICE_POSTGRES_HOST}:{self.AUTH_SERVICE_POSTGRES_PORT}/{self.AUTH_SERVICE_POSTGRES_DB_NAME}"
 
 
+class RabbitMQSettings(BaseModel):
+    RABBITMQ_USER: str
+    RABBITMQ_PASSWORD: str
+    RABBITMQ_HOST: str = 'rabbitmq'
+    RABBITMQ_PORT: int = 5672
+
+    USER_EVENTS_EXCHANGE_NAME: str = "user-events-exchange"
+    USER_CREATED_ROUTING_KEY: str = "user.registered"
+
+    @property
+    def amqp_url(self) -> str:
+        return f"amqp://{self.RABBITMQ_USER}:{self.RABBITMQ_PASSWORD}@{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/"
+
+
 class JwtSettings(BaseModel):
     JWT_ALGORITHM: str = 'RS256'
     JWT_PRIVATE_KEY: str
@@ -41,6 +55,7 @@ class Settings(
     UvicornSettings,
     CorsSettings,
     PostgresSettings,
+    RabbitMQSettings,
     JwtSettings,
     PasswordSettings,
     BaseSettings

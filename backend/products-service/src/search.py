@@ -5,7 +5,7 @@ from elasticsearch import AsyncElasticsearch
 
 from src.config import settings
 
-es = AsyncElasticsearch(["http://elasticsearch:9200"])
+es = AsyncElasticsearch([settings.elastic_url])
 
 
 async def create_products_index():

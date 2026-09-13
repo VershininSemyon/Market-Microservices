@@ -15,7 +15,7 @@ services:
     depends_on:
       auth-postgres:
         condition: service_healthy
-      elasticsearch:
+      rabbitmq:
         condition: service_healthy
     
   products-backend:
@@ -33,7 +33,26 @@ services:
     depends_on:
       products-postgres:
         condition: service_healthy
-      
+      elasticsearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: dockerfile
+    container_name: notification-service
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - app_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
 
   api-gateway:
     image: nginx:1.27-alpine
@@ -153,8 +172,12 @@ services:
     restart: always
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - http.cors.enabled=true
+      - http.cors.allow-origin="http://localhost:5601,http://127.0.0.1:5601"
+      - http.cors.allow-headers=X-Requested-With,Content-Type,Content-Length,Authorization
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
     ports:
@@ -162,30 +185,58 @@ services:
     networks:
       - app_net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      test: ["CMD", "curl", "-f", "-u", "${ELASTIC_USER}:${ELASTIC_PASSWORD}", "http://localhost:9200/_cluster/health"]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  opensearch-dashboards:
-    image: opensearchproject/opensearch-dashboards:2.12.0
-    container_name: es-dashboards
+  elasticvue:
+    image: cars10/elasticvue:1.15.0
+    container_name: elasticvue
     restart: always
     ports:
-      - "5601:5601"
-    environment:
-      - OPENSEARCH_HOSTS=["http://elasticsearch:9200"]
-      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+      - "5601:8080"
     networks:
       - app_net
     depends_on:
       elasticsearch:
         condition: service_healthy
+  
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+  
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: mailhog
+    restart: always
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - app_net
 
 volumes:
   auth-postgres-data:
   products-postgres-data:
   elasticsearch-data:
+  rabbitmq-data:
   prometheus-data:
   grafana-data:
 
