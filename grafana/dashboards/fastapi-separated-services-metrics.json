@@ -1389,8 +1389,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "FastAPI Application Metrics",
-  "uid": "fastapi-metrics",
+  "title": "FastAPI Separated Services Metrics",
+  "uid": "fastapi-separated-services-metrics",
   "version": 1,
   "weekStart": ""
 }

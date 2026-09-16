@@ -617,8 +617,8 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "FastAPI Application Metrics",
-  "uid": "fastapi-metrics",
+  "title": "FastAPI Union Services Metrics",
+  "uid": "fastapi-union-services-metrics",
   "version": 1,
   "weekStart": ""
 }
