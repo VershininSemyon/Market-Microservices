@@ -31,6 +31,10 @@ class RabbitMQSettings(BaseModel):
     RABBITMQ_HOST: str = 'rabbitmq'
     RABBITMQ_PORT: int = 5672
 
+    REVIEWS_EVENTS_EXCHANGE_NAME: str = "reviews-events-exchange"
+    REVIEW_CREATED_ROUTING_KEY: str = "review.created"
+    REVIEW_DELETED_ROUTING_KEY: str = "review.deleted"
+
     @property
     def amqp_url(self) -> str:
         return f"amqp://{self.RABBITMQ_USER}:{self.RABBITMQ_PASSWORD}@{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/"

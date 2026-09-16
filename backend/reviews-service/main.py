@@ -7,15 +7,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from src.api import review_router
 from src.config import settings
 from src.database import engine
 from src.exceptions import ReviewError
+from src.producer import rabbitmq_producer
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await rabbitmq_producer.connect()
     yield
     await engine.dispose()
+    await rabbitmq_producer.close()
 
 
 app = FastAPI(
@@ -35,6 +39,7 @@ if settings.CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+app.include_router(review_router)
 
 Instrumentator().instrument(app).expose(app)
 

@@ -5,7 +5,13 @@ import logging
 import aio_pika
 
 from src.config import settings
-from src.mail import send_product_created_email, send_product_deleted_email, send_welcome_email
+from src.mail import (
+    send_product_created_email,
+    send_product_deleted_email,
+    send_review_created_email,
+    send_review_deleted_email,
+    send_welcome_email,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +90,44 @@ class RabbitMQConsumer:
             except Exception as e:
                 logger.error(f"Непредвиденная ошибка при обработке сообщения: {e}")
 
+    async def process_review_created(self, message: aio_pika.IncomingMessage) -> None:
+        async with message.process(requeue=True):
+            try:
+                body = json.loads(message.body.decode("utf-8"))
+                product_id = body.get("product_id")
+                email = body.get("user_email")
+
+                if not product_id or not email:
+                    logger.warning(f"Некорректный формат сообщения: {body}")
+                    return
+
+                logger.info(f"Получено событие создания отзыва для продукта {product_id} ({email})")
+                await send_review_created_email(product_id=product_id, to_email=email)
+
+            except json.JSONDecodeError:
+                logger.error(f"Ошибка декодирования JSON: {message.body}")
+            except Exception as e:
+                logger.error(f"Непредвиденная ошибка при обработке сообщения: {e}")
+
+    async def process_review_deleted(self, message: aio_pika.IncomingMessage) -> None:
+        async with message.process(requeue=True):
+            try:
+                body = json.loads(message.body.decode("utf-8"))
+                product_id = body.get("product_id")
+                email = body.get("user_email")
+
+                if not product_id or not email:
+                    logger.warning(f"Некорректный формат сообщения: {body}")
+                    return
+
+                logger.info(f"Получено событие удаления отзыва для продукта {product_id} ({email})")
+                await send_review_deleted_email(product_id=product_id, to_email=email)
+
+            except json.JSONDecodeError:
+                logger.error(f"Ошибка декодирования JSON: {message.body}")
+            except Exception as e:
+                logger.error(f"Непредвиденная ошибка при обработке сообщения: {e}")
+
     async def start_consuming(self) -> None:
         await self.connect()
 
@@ -130,3 +174,30 @@ class RabbitMQConsumer:
             routing_key=settings.PRODUCT_DELETED_ROUTING_KEY,
         )
         await product_deleted_queue.consume(self.process_product_deleted)
+
+        # Отзывы
+        review_exchange = await self._channel.declare_exchange(
+            name=settings.REVIEWS_EVENTS_EXCHANGE_NAME,
+            type=aio_pika.ExchangeType.TOPIC,
+            durable=True,
+        )
+
+        review_created_queue = await self._channel.declare_queue(
+            name=settings.REVIEW_CREATED_QUEUE_NAME,
+            durable=True,
+        )
+        await review_created_queue.bind(
+            exchange=review_exchange,
+            routing_key=settings.REVIEW_CREATED_ROUTING_KEY,
+        )
+        await review_created_queue.consume(self.process_review_created)
+
+        review_deleted_queue = await self._channel.declare_queue(
+            name=settings.REVIEW_DELETED_QUEUE_NAME,
+            durable=True,
+        )
+        await review_deleted_queue.bind(
+            exchange=review_exchange,
+            routing_key=settings.REVIEW_DELETED_ROUTING_KEY,
+        )
+        await review_deleted_queue.consume(self.process_review_deleted)
