@@ -12,7 +12,13 @@ class RabbitMQSettings(BaseModel):
 
     USER_EVENTS_EXCHANGE_NAME: str = "user-events-exchange"
     USER_CREATED_ROUTING_KEY: str = "user.registered"
-    NOTIFICATION_QUEUE_NAME: str = "notification.user-registered-queue"
+    USER_CREATED_QUEUE_NAME: str = "notification.user-registered-queue"
+
+    PRODUCTS_EVENTS_EXCHANGE_NAME: str = "products-events-exchange"
+    PRODUCT_CREATED_ROUTING_KEY: str = "product.created"
+    PRODUCT_CREATED_QUEUE_NAME: str = "notification.product-created-queue"
+    PRODUCT_DELETED_ROUTING_KEY: str = "product.deleted"
+    PRODUCT_DELETED_QUEUE_NAME: str = "notification.product-deleted-queue"
 
     @property
     def amqp_url(self) -> str:

@@ -1,7 +1,7 @@
 
 from typing import Annotated
-
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
 
 from src.dependencies import CurrentUserDep, ProductServiceDep, require_admin
@@ -19,8 +19,9 @@ product_router = APIRouter(prefix="/products", tags=["Products"])
 async def create_product(
     data: ProductCreateSchema,
     product_service: ProductServiceDep,
+    user: CurrentUserDep,
 ) -> ProductReadSchema:
-    return await product_service.create_product(data)
+    return await product_service.create_product(data, user.email)
 
 
 @product_router.get(
@@ -43,8 +44,9 @@ async def list_products(
 async def delete_product(
     product_id: UUID,
     product_service: ProductServiceDep,
+    user: CurrentUserDep
 ) -> None:
-    await product_service.delete_product(product_id)
+    await product_service.delete_product(product_id, user.email)
 
 
 @product_router.get(

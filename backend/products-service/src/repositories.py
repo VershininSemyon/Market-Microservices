@@ -1,5 +1,5 @@
 
-from sqlalchemy import asc, delete, desc, insert, select, update
+from sqlalchemy import and_, asc, desc, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.enums import ProductSortFieldEnum, SortOrderEnum
@@ -48,7 +48,10 @@ class ProductRepository:
         return result.scalars().all()
 
     async def get_product_by_id(self, product_id) -> ProductORM:
-        stmt = select(ProductORM).where(ProductORM.id == product_id)
+        stmt = select(ProductORM).where(and_(
+            ProductORM.is_active,
+            ProductORM.id == product_id
+        ))
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
@@ -58,7 +61,15 @@ class ProductRepository:
         return result.scalar_one_or_none()
 
     async def update_product(self, product_id, data: dict) -> ProductORM:
-        stmt = update(ProductORM).where(ProductORM.id == product_id).values(**data).returning(ProductORM)
+        stmt = (
+            update(ProductORM)
+            .where(and_(
+                ProductORM.is_active,
+                ProductORM.id == product_id
+            ))
+            .values(**data)
+            .returning(ProductORM)
+        )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -66,6 +77,9 @@ class ProductRepository:
         await self.update_product(product_id, {"is_active": False})
 
     async def get_product_by_name(self, name: str) -> ProductORM:
-        stmt = select(ProductORM).where(ProductORM.name == name)
+        stmt = select(ProductORM).where(and_(
+            ProductORM.is_active,
+            ProductORM.name == name
+        ))
         result = await self.session.execute(stmt)
         return result.scalars().first()

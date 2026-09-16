@@ -1,7 +1,9 @@
 
 from uuid import UUID
 
+from src.config import settings
 from src.exceptions import ProductAlreadyExistsError, ProductNotFoundError
+from src.producer import rabbitmq_producer
 from src.schemas import ProductCreateSchema, ProductQueryParams, ProductReadSchema, ProductUpdateSchema
 from src.search import delete_product_index, index_product, search_product
 from src.unitofwork import UnitOfWork
@@ -11,7 +13,7 @@ class ProductService:
     def __init__(self, uow: UnitOfWork):
         self.uow = uow
 
-    async def create_product(self, data: ProductCreateSchema) -> ProductReadSchema:
+    async def create_product(self, data: ProductCreateSchema, user_email: str) -> ProductReadSchema:
         async with self.uow:
             product_exists = await self.uow.product_repo.get_product_by_name(data.name)
             if product_exists:
@@ -21,6 +23,13 @@ class ProductService:
             await self.uow.commit()
 
         await index_product(product.id, product.name, product.description)
+        await rabbitmq_producer.publish_message(
+            routing_key=settings.PRODUCT_CREATED_ROUTING_KEY,
+            message_body={
+                "product_name": product.name,
+                "created_by": user_email
+            }
+        )
         return ProductReadSchema.model_validate(product)
 
     async def get_products_list(self, filters: ProductQueryParams) -> list[ProductReadSchema]:
@@ -42,11 +51,23 @@ class ProductService:
 
         return [ProductReadSchema.model_validate(product) for product in products]
 
-    async def delete_product(self, product_id: UUID) -> None:
+    async def delete_product(self, product_id: UUID, user_email: str) -> None:
         async with self.uow:
+            product = await self.uow.product_repo.get_product_by_id(product_id)
+            if not product:
+                raise ProductNotFoundError()
+
             await self.uow.product_repo.delete_product(product_id)
             await self.uow.commit()
 
+        await rabbitmq_producer.publish_message(
+            routing_key=settings.PRODUCT_DELETED_ROUTING_KEY,
+            message_body={
+                "product_id": str(product_id),
+                "product_name": product.name,
+                "deleted_by": user_email
+            }
+        )
         await delete_product_index(product_id)
 
     async def get_product_by_id(self, product_id: UUID) -> ProductReadSchema:

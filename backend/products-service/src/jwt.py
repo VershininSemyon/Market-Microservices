@@ -17,16 +17,11 @@ class TokenData(BaseModel):
 
 def decode_token(token: str) -> TokenData:
     try:
-        import logging
-
-        logging.critical(token)
         data = jwt.decode(
             jwt=token,
             algorithms=[settings.JWT_ALGORITHM],
             key=settings.JWT_PUBLIC_KEY
         )
-
-        logging.critical(data)
 
         if data['token_type'] != 'access':
             raise HTTPException(status_code=401, detail="Неверный тип токена")

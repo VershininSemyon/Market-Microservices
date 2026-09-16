@@ -1,4 +1,5 @@
 
+from src.config import settings
 from src.exceptions import (
     EmailAlreadyExistsError,
     InvalidPasswordError,
@@ -44,10 +45,13 @@ class AuthService:
             created_user = await self.uow.user_repo.create_user(user_dict)
             await self.uow.commit()
 
-        await rabbitmq_producer.publish_user_registered({
-            "username": created_user.username,
-            "email": created_user.email
-        })
+        await rabbitmq_producer.publish_user_registered(
+            routing_key=settings.USER_CREATED_ROUTING_KEY,
+            message_body={
+                "username": created_user.username,
+                "email": created_user.email
+            }
+        )
         return UserReadSchema.model_validate(created_user)
 
     async def delete_user(self, user_id: str) -> None:

@@ -20,3 +20,7 @@ scrape_configs:
       - targets: ['products-backend:8002']
         labels:
           service: 'products-service'
+
+      - targets: ['reviews-backend:8003']
+        labels:
+          service: 'reviews-service'

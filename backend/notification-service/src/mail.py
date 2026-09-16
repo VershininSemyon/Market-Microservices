@@ -36,13 +36,75 @@ async def send_welcome_email(username: str, to_email: str) -> None:
     """
     message.set_content(html_content, subtype="html")
 
-    try:
-        await send(
-            message,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            use_tls=False,
-            start_tls=False
-        )
-    except Exception:
-        pass
+    await send(
+        message,
+        hostname=settings.SMTP_HOST,
+        port=settings.SMTP_PORT,
+        use_tls=False,
+        start_tls=False
+    )
+
+
+async def send_product_created_email(product_name: str, to_email: str) -> None:
+    message = EmailMessage()
+    message["From"] = settings.SMTP_FROM
+    message["To"] = to_email
+    message["Subject"] = "Добавление продукта"
+
+    html_content = f"""
+        <html>
+            <body>
+                <p>
+                    Вы добавили новый продукт: {product_name}.
+                </p>
+
+                <br>
+
+                <small>
+                    Это автоматическое письмо, отвечать на него не нужно.
+                </small>
+            </body>
+        </html>
+    """
+    message.set_content(html_content, subtype="html")
+
+    await send(
+        message,
+        hostname=settings.SMTP_HOST,
+        port=settings.SMTP_PORT,
+        use_tls=False,
+        start_tls=False
+    )
+
+
+
+async def send_product_deleted_email(product_name: str, to_email: str) -> None:
+    message = EmailMessage()
+    message["From"] = settings.SMTP_FROM
+    message["To"] = to_email
+    message["Subject"] = "Удаление продукта"
+
+    html_content = f"""
+        <html>
+            <body>
+                <p>
+                    Вы удалили продукт: {product_name}.
+                </p>
+
+                <br>
+
+                <small>
+                    Это автоматическое письмо, отвечать на него не нужно.
+                </small>
+            </body>
+        </html>
+    """
+    message.set_content(html_content, subtype="html")
+
+    await send(
+        message,
+        hostname=settings.SMTP_HOST,
+        port=settings.SMTP_PORT,
+        use_tls=False,
+        start_tls=False
+    )

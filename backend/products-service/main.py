@@ -12,14 +12,17 @@ from src.api import product_router
 from src.config import settings
 from src.database import engine
 from src.exceptions import ProductError
+from src.producer import rabbitmq_producer
 from src.search import create_products_index
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await create_products_index()
+    await rabbitmq_producer.connect()
     yield
     await engine.dispose()
+    await rabbitmq_producer.close()
 
 
 app = FastAPI(

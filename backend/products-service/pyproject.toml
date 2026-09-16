@@ -4,6 +4,7 @@ name = "products-service"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "aio-pika>=10.0.1",
     "alembic>=1.19.1",
     "asyncpg>=0.31.0",
     "elasticsearch[async]>=8.12.0,<9.0.0",

@@ -37,6 +37,21 @@ class ElasticSearchSettings(BaseModel):
         return f"http://{self.ELASTIC_USER}:{self.ELASTIC_PASSWORD}@{self.ELASTIC_HOST}:{self.ELASTIC_PORT}"
 
 
+class RabbitMQSettings(BaseModel):
+    RABBITMQ_USER: str
+    RABBITMQ_PASSWORD: str
+    RABBITMQ_HOST: str = 'rabbitmq'
+    RABBITMQ_PORT: int = 5672
+
+    PRODUCTS_EVENTS_EXCHANGE_NAME: str = "products-events-exchange"
+    PRODUCT_CREATED_ROUTING_KEY: str = "product.created"
+    PRODUCT_DELETED_ROUTING_KEY: str = "product.deleted"
+
+    @property
+    def amqp_url(self) -> str:
+        return f"amqp://{self.RABBITMQ_USER}:{self.RABBITMQ_PASSWORD}@{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/"
+
+
 class JwtSettings(BaseModel):
     JWT_ALGORITHM: str = 'RS256'
     JWT_PUBLIC_KEY: str
@@ -48,6 +63,7 @@ class Settings(
     PostgresSettings,
     ElasticSearchSettings,
     JwtSettings,
+    RabbitMQSettings,
     BaseSettings
 ):
     model_config = SettingsConfigDict(
