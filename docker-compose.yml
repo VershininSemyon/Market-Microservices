@@ -145,6 +145,42 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  
+  auth-redis:
+    image: redis:8.0-alpine
+    container_name: auth-redis
+    networks:
+      - app_net
+    volumes:
+      - auth-redis:/data
+    environment:
+      - REDIS_PASSWORD=${AUTH_SERVICE_REDIS_PASSWORD}
+    command: redis-server --requirepass ${AUTH_SERVICE_REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "${AUTH_SERVICE_REDIS_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${AUTH_SERVICE_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  products-redis:
+    image: redis:8.0-alpine
+    container_name: products-redis
+    networks:
+      - app_net
+    volumes:
+      - products-redis:/data
+    environment:
+      - REDIS_PASSWORD=${PRODUCTS_SERVICE_REDIS_PASSWORD}
+    command: redis-server --requirepass ${PRODUCTS_SERVICE_REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "${PRODUCTS_SERVICE_REDIS_EXTERNAL_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${PRODUCTS_SERVICE_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   adminer:
     image: adminer:4.8.1
@@ -274,6 +310,8 @@ volumes:
   auth-postgres-data:
   products-postgres-data:
   reviews-postgres-data:
+  products-redis:
+  auth-redis:
   elasticsearch-data:
   rabbitmq-data:
   prometheus-data:

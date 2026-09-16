@@ -24,6 +24,16 @@ class PostgresSettings(BaseModel):
         return f"postgresql+asyncpg://{self.PRODUCTS_SERVICE_POSTGRES_USER}:{self.PRODUCTS_SERVICE_POSTGRES_PASSWORD}@{self.PRODUCTS_SERVICE_POSTGRES_HOST}:{self.PRODUCTS_SERVICE_POSTGRES_PORT}/{self.PRODUCTS_SERVICE_POSTGRES_DB_NAME}"
 
 
+class RedisSettings(BaseModel):
+    PRODUCTS_SERVICE_REDIS_PASSWORD: str
+    PRODUCTS_SERVICE_REDIS_HOST: str = "redis"
+    PRODUCTS_SERVICE_REDIS_PORT: int = 6379
+
+    @property
+    def redis_url(self) -> str:
+        return f"redis://:{self.PRODUCTS_SERVICE_REDIS_PASSWORD}@{self.PRODUCTS_SERVICE_REDIS_HOST}:{self.PRODUCTS_SERVICE_REDIS_PORT}/0"
+
+
 class ElasticSearchSettings(BaseModel):
     ELASTIC_USER: str
     ELASTIC_PASSWORD: str
@@ -61,6 +71,7 @@ class Settings(
     UvicornSettings,
     CorsSettings,
     PostgresSettings,
+    RedisSettings,
     ElasticSearchSettings,
     JwtSettings,
     RabbitMQSettings,

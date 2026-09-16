@@ -13,15 +13,18 @@ from src.config import settings
 from src.database import engine
 from src.exceptions import ProductError
 from src.producer import rabbitmq_producer
+from src.redis_manager import redis_manager
 from src.search import create_products_index
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await create_products_index()
+    await redis_manager.connect()
     await rabbitmq_producer.connect()
     yield
     await engine.dispose()
+    await redis_manager.disconnect()
     await rabbitmq_producer.close()
 
 
