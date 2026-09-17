@@ -31,7 +31,7 @@ async def authenticate(
     "/token/refresh",
     status_code=status.HTTP_200_OK,
 )
-def refresh_token(
+async def refresh_token(
     auth_service: AuthServiceDep,
     refresh_token: str | None = Body(default=None),
 ):
@@ -41,11 +41,7 @@ def refresh_token(
             detail="Нет refresh токена"
         )
 
-    access_token = auth_service.refresh_token(refresh_token)
-
-    return {
-        "access": access_token
-    }
+    return await auth_service.refresh_token(refresh_token)
 
 
 user_router = APIRouter(prefix="/auth/users", tags=["Users"])

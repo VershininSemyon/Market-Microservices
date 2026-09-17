@@ -31,6 +31,12 @@ class InvalidTokenError(TokenDecodeError):
 
 
 ###
+class TokenBlacklistError(AuthError):
+    status_code = 401
+    detail: str = "Токен в чёрном списке"
+
+
+###
 class InvalidUserDataError(AuthError):
     status_code: int = 401
     detail: str = "Неверные учётные данные"

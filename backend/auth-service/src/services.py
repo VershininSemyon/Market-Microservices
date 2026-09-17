@@ -4,10 +4,12 @@ from src.exceptions import (
     EmailAlreadyExistsError,
     InvalidPasswordError,
     InvalidTokenTypeError,
+    TokenBlacklistError,
     UsernameAlreadyExistsError,
     UserNotFoundError,
 )
 from src.producer import rabbitmq_producer
+from src.redis_cache_backend import redis_cache
 from src.schemas import (
     JWTTokenPairResponseSchema,
     UserCreateSchema,
@@ -59,6 +61,8 @@ class AuthService:
             await self.uow.user_repo.delete_user(user_id)
             await self.uow.commit()
 
+        await redis_cache.del_key(f"users:{user_id}:refresh-token")
+
     async def change_user(self, current_user: UserReadSchema, data: UserUpdateSchema) -> UserReadSchema:
         async with self.uow:
             if current_user.username != data.username:
@@ -93,16 +97,28 @@ class AuthService:
             "is_admin": user.is_admin
         }
 
+        access = create_access_token(user_data)
+        refresh = create_refresh_token(user_data)
+        await redis_cache.set_value(
+            f"users:{user.id}:refresh-token",
+            refresh,
+            settings.REFRESH_TOKEN_LIFETIME_DAYS * 24 * 3600
+        )
+
         return JWTTokenPairResponseSchema.model_validate({
-            "access": create_access_token(user_data),
-            "refresh": create_refresh_token(user_data)
+            "access": access,
+            "refresh": refresh
         })
 
-    def refresh_token(self, refresh_token: str) -> str:
+    async def refresh_token(self, refresh_token: str) -> JWTTokenPairResponseSchema:
         data = decode_token(refresh_token)
 
         if data.get('token_type') != 'refresh':
             raise InvalidTokenTypeError()
+
+        stored_token = await redis_cache.get_value(f"users:{data['id']}:refresh-token")
+        if stored_token != refresh_token:
+            raise TokenBlacklistError()
 
         user_data = {
             "id": data['id'],
@@ -112,7 +128,17 @@ class AuthService:
         }
 
         access = create_access_token(user_data)
-        return access
+        refresh = create_refresh_token(user_data)
+        await redis_cache.set_value(
+            f"users:{data['id']}:refresh-token",
+            refresh,
+            settings.REFRESH_TOKEN_LIFETIME_DAYS * 24 * 3600
+        )
+
+        return JWTTokenPairResponseSchema.model_validate({
+            "access": access,
+            "refresh": refresh
+        })
 
     async def authenticate_user(self, access_token: str) -> UserReadSchema:
         data = decode_token(access_token)
