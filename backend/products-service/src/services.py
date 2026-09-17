@@ -1,9 +1,12 @@
 
+import json
 from uuid import UUID
 
 from src.config import settings
+from src.enums import SortOrderEnum
 from src.exceptions import ProductAlreadyExistsError, ProductNotFoundError
 from src.producer import rabbitmq_producer
+from src.redis_cache_backend import redis_cache
 from src.schemas import ProductCreateSchema, ProductQueryParams, ProductReadSchema, ProductUpdateSchema
 from src.search import delete_product_index, index_product, search_product
 from src.unitofwork import UnitOfWork
@@ -12,6 +15,9 @@ from src.unitofwork import UnitOfWork
 class ProductService:
     def __init__(self, uow: UnitOfWork):
         self.uow = uow
+
+    async def _invalidate_products_list_cache(self):
+        await redis_cache.del_key("products:list")
 
     async def create_product(self, data: ProductCreateSchema, user_email: str) -> ProductReadSchema:
         async with self.uow:
@@ -22,6 +28,7 @@ class ProductService:
             product = await self.uow.product_repo.create_product(data.model_dump())
             await self.uow.commit()
 
+        await self._invalidate_products_list_cache()
         await index_product(product.id, product.name, product.description)
         await rabbitmq_producer.publish_message(
             routing_key=settings.PRODUCT_CREATED_ROUTING_KEY,
@@ -33,6 +40,32 @@ class ProductService:
         return ProductReadSchema.model_validate(product)
 
     async def get_products_list(self, filters: ProductQueryParams) -> list[ProductReadSchema]:
+        # Первый запрос без параметров - кэш
+        if all([
+            filters.text_query is None,
+            filters.min_price is None,
+            filters.max_price is None,
+            filters.order_by is None,
+            filters.order == SortOrderEnum.ASC,
+            filters.limit == 10,
+            filters.offset == 0
+        ]):
+            cached = await redis_cache.get_value("products:list")
+            if cached is not None:
+                return [ProductReadSchema.model_validate(data) for data in json.loads(cached)]
+
+            async with self.uow:
+                products = await self.uow.product_repo.list_products()
+            products = [ProductReadSchema.model_validate(product) for product in products]
+
+            await redis_cache.set_value(
+                "products:list",
+                json.dumps([product.model_dump(mode='json') for product in products]),
+                3600 * 24 # день
+            )
+            return products
+
+
         product_ids = None
 
         if filters.text_query:
@@ -60,6 +93,8 @@ class ProductService:
             await self.uow.product_repo.delete_product(product_id)
             await self.uow.commit()
 
+        await self._invalidate_products_list_cache()
+        await delete_product_index(product_id)
         await rabbitmq_producer.publish_message(
             routing_key=settings.PRODUCT_DELETED_ROUTING_KEY,
             message_body={
@@ -68,7 +103,6 @@ class ProductService:
                 "deleted_by": user_email
             }
         )
-        await delete_product_index(product_id)
 
     async def get_product_by_id(self, product_id: UUID) -> ProductReadSchema:
         async with self.uow:
@@ -89,5 +123,6 @@ class ProductService:
                 raise ProductNotFoundError()
             await self.uow.commit()
 
+        await self._invalidate_products_list_cache()
         await index_product(product.id, product.name, product.description)
         return ProductReadSchema.model_validate(product)
