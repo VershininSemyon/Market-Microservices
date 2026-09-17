@@ -43,3 +43,7 @@ class ReviewRepository:
         stmt = select(func.avg(ReviewORM.rating)).where(ReviewORM.product_id == product_id)
         result = await self.session.execute(stmt)
         return result.scalar() or 0.0
+
+    async def delete_product_reviews(self, product_id: str) -> None:
+        stmt = delete(ReviewORM).where(ReviewORM.product_id == product_id)
+        await self.session.execute(stmt)

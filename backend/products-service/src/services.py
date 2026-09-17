@@ -16,8 +16,10 @@ class ProductService:
     def __init__(self, uow: UnitOfWork):
         self.uow = uow
 
-    async def _invalidate_products_list_cache(self):
+    async def _invalidate_products_cache(self, product_id: str | None = None):
         await redis_cache.del_key("products:list")
+        if product_id is not None:
+            await redis_cache.del_key(f"products:{product_id}")
 
     async def create_product(self, data: ProductCreateSchema, user_email: str) -> ProductReadSchema:
         async with self.uow:
@@ -28,7 +30,7 @@ class ProductService:
             product = await self.uow.product_repo.create_product(data.model_dump())
             await self.uow.commit()
 
-        await self._invalidate_products_list_cache()
+        await self._invalidate_products_cache()
         await index_product(product.id, product.name, product.description)
         await rabbitmq_producer.publish_message(
             routing_key=settings.PRODUCT_CREATED_ROUTING_KEY,
@@ -93,7 +95,7 @@ class ProductService:
             await self.uow.product_repo.delete_product(product_id)
             await self.uow.commit()
 
-        await self._invalidate_products_list_cache()
+        await self._invalidate_products_cache(product_id)
         await delete_product_index(product_id)
         await rabbitmq_producer.publish_message(
             routing_key=settings.PRODUCT_DELETED_ROUTING_KEY,
@@ -105,12 +107,23 @@ class ProductService:
         )
 
     async def get_product_by_id(self, product_id: UUID) -> ProductReadSchema:
+        cached = await redis_cache.get_value(f"products:{product_id}")
+        if cached is not None:
+            return ProductReadSchema.model_validate_json(cached)
+
         async with self.uow:
             product = await self.uow.product_repo.get_product_by_id(product_id)
-            if not product:
-                raise ProductNotFoundError()
 
-        return ProductReadSchema.model_validate(product)
+        if not product:
+            raise ProductNotFoundError()
+
+        product = ProductReadSchema.model_validate(product)
+        await redis_cache.set_value(
+            f"products:{product_id}",
+            product.model_dump_json(),
+            3600 * 24 * 7 # неделя
+        )
+        return product
 
     async def update_product(self, product_id: UUID, data: ProductUpdateSchema) -> ProductReadSchema:
         async with self.uow:
@@ -123,6 +136,6 @@ class ProductService:
                 raise ProductNotFoundError()
             await self.uow.commit()
 
-        await self._invalidate_products_list_cache()
+        await self._invalidate_products_cache(product_id)
         await index_product(product.id, product.name, product.description)
         return ProductReadSchema.model_validate(product)

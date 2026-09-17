@@ -55,6 +55,23 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+  
+  reviews-consumer:
+    build:
+      context: ./backend/reviews-service
+      dockerfile: dockerfile
+    container_name: reviews-consumer
+    restart: always
+    env_file:
+      - .env
+    command: ["python", "run_consumer.py"]
+    networks:
+      - app_net
+    depends_on:
+      reviews-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   notification-service:
     build:
