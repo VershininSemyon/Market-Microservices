@@ -1,5 +1,6 @@
 
 import json
+from datetime import date
 from uuid import UUID
 
 from src.config import settings
@@ -36,7 +37,8 @@ class ProductService:
             routing_key=settings.PRODUCT_CREATED_ROUTING_KEY,
             message_body={
                 "product_name": product.name,
-                "created_by": user_email
+                "created_by": user_email,
+                "event_date": str(date.today())
             }
         )
         return ProductReadSchema.model_validate(product)
@@ -102,7 +104,8 @@ class ProductService:
             message_body={
                 "product_id": str(product_id),
                 "product_name": product.name,
-                "deleted_by": user_email
+                "deleted_by": user_email,
+                "event_date": str(date.today())
             }
         )
 

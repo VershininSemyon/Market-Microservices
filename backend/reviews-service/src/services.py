@@ -1,4 +1,6 @@
 
+from datetime import date
+
 from src.config import settings
 from src.exceptions import ReviewAlreadyExistsError, ReviewNotFoundError, ReviewOwnershipError
 from src.producer import rabbitmq_producer
@@ -35,7 +37,8 @@ class ReviewService:
             routing_key=settings.REVIEW_CREATED_ROUTING_KEY,
             message_body={
                 "product_id": str(review.product_id),
-                "user_email": user_email
+                "user_email": user_email,
+                "event_date": str(date.today())
             }
         )
         return ReviewReadSchema.model_validate(review)
@@ -76,7 +79,8 @@ class ReviewService:
             routing_key=settings.REVIEW_DELETED_ROUTING_KEY,
             message_body={
                 "product_id": str(review.product_id),
-                "user_email": user_email
+                "user_email": user_email,
+                "event_date": str(date.today())
             }
         )
 

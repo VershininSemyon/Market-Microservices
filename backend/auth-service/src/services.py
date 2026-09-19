@@ -1,4 +1,6 @@
 
+from datetime import date
+
 from src.config import settings
 from src.exceptions import (
     EmailAlreadyExistsError,
@@ -51,7 +53,8 @@ class AuthService:
             routing_key=settings.USER_CREATED_ROUTING_KEY,
             message_body={
                 "username": created_user.username,
-                "email": created_user.email
+                "email": created_user.email,
+                "event_date": str(date.today())
             }
         )
         return UserReadSchema.model_validate(created_user)
@@ -66,7 +69,8 @@ class AuthService:
         await rabbitmq_producer.publish_message(
             routing_key=settings.USER_DELETED_ROUTING_KEY,
             message_body={
-                "email": user.email
+                "email": user.email,
+                "event_date": str(date.today())
             }
         )
 

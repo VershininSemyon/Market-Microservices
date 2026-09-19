@@ -72,6 +72,41 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+  
+  analytics-backend:
+    build:
+      context: ./backend/analytics-service
+      dockerfile: dockerfile
+    container_name: analytics-backend
+    restart: always
+    env_file:
+      - .env
+    expose:
+      - "8004"
+    networks:
+      - app_net
+    depends_on:
+      reviews-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+  
+  analytics-consumer:
+    build:
+      context: ./backend/analytics-service
+      dockerfile: dockerfile
+    container_name: analytics-consumer
+    restart: always
+    env_file:
+      - .env
+    command: ["python", "run_consumer.py"]
+    networks:
+      - app_net
+    depends_on:
+      analytics-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   notification-service:
     build:
@@ -159,6 +194,26 @@ services:
       - "${REVIEWS_SERVICE_POSTGRES_EXTERNAL_PORT}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${REVIEWS_SERVICE_POSTGRES_USER} -d ${REVIEWS_SERVICE_POSTGRES_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  analytics-postgres:
+    image: postgres:17-alpine
+    container_name: analytics-postgres
+    restart: always
+    volumes:
+      - analytics-postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${ANALYTICS_SERVICE_POSTGRES_DB_NAME}
+      POSTGRES_USER: ${ANALYTICS_SERVICE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${ANALYTICS_SERVICE_POSTGRES_PASSWORD}
+    networks:
+      - app_net
+    ports:
+      - "${ANALYTICS_SERVICE_POSTGRES_EXTERNAL_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ANALYTICS_SERVICE_POSTGRES_USER} -d ${ANALYTICS_SERVICE_POSTGRES_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -327,6 +382,7 @@ volumes:
   auth-postgres-data:
   products-postgres-data:
   reviews-postgres-data:
+  analytics-postgres-data:
   products-redis:
   auth-redis:
   elasticsearch-data:
