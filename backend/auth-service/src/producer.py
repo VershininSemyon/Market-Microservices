@@ -23,7 +23,7 @@ class RabbitMQProducer:
         if self._connection and not self._connection.is_closed:
             await self._connection.close()
 
-    async def publish_user_registered(
+    async def publish_message(
         self,
         routing_key: str,
         message_body: dict
@@ -32,7 +32,7 @@ class RabbitMQProducer:
 
         exchange = await self._channel.declare_exchange(
             name=settings.USER_EVENTS_EXCHANGE_NAME,
-            type=aio_pika.ExchangeType.DIRECT,
+            type=aio_pika.ExchangeType.TOPIC,
             durable=True
         )
 

@@ -47,7 +47,7 @@ class AuthService:
             created_user = await self.uow.user_repo.create_user(user_dict)
             await self.uow.commit()
 
-        await rabbitmq_producer.publish_user_registered(
+        await rabbitmq_producer.publish_message(
             routing_key=settings.USER_CREATED_ROUTING_KEY,
             message_body={
                 "username": created_user.username,
@@ -58,10 +58,17 @@ class AuthService:
 
     async def delete_user(self, user_id: str) -> None:
         async with self.uow:
+            user = await self.uow.user_repo.get_user_by_id(user_id)
             await self.uow.user_repo.delete_user(user_id)
             await self.uow.commit()
 
         await redis_cache.del_key(f"users:{user_id}:refresh-token")
+        await rabbitmq_producer.publish_message(
+            routing_key=settings.USER_DELETED_ROUTING_KEY,
+            message_body={
+                "email": user.email
+            }
+        )
 
     async def change_user(self, current_user: UserReadSchema, data: UserUpdateSchema) -> UserReadSchema:
         async with self.uow:

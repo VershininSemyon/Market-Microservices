@@ -11,8 +11,10 @@ class RabbitMQSettings(BaseModel):
     RABBITMQ_PORT: int = 5672
 
     USER_EVENTS_EXCHANGE_NAME: str = "user-events-exchange"
-    USER_CREATED_ROUTING_KEY: str = "user.registered"
-    USER_CREATED_QUEUE_NAME: str = "notification.user-registered-queue"
+    USER_CREATED_ROUTING_KEY: str = "user.created"
+    USER_CREATED_QUEUE_NAME: str = "notification.user-created-queue"
+    USER_DELETED_ROUTING_KEY: str = "user.deleted"
+    USER_DELETED_QUEUE_NAME: str = "notification.user-deleted-queue"
 
     PRODUCTS_EVENTS_EXCHANGE_NAME: str = "products-events-exchange"
     PRODUCT_CREATED_ROUTING_KEY: str = "product.created"

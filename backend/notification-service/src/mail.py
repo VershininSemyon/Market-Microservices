@@ -49,6 +49,20 @@ async def send_welcome_email(username: str, to_email: str) -> None:
     await _send_email(subject=subject, html_content=html_content, to_email=to_email)
 
 
+async def send_account_deleted_email(to_email: str) -> None:
+    subject = "Вы удалили аккаунт"
+    html_content = """
+        <html>
+            <body>
+                <h1>
+                    Вы удалили аккаунт.
+                </h1>
+            </body>
+        </html>
+    """
+    await _send_email(subject=subject, html_content=html_content, to_email=to_email)
+
+
 async def send_product_created_email(product_name: str, to_email: str) -> None:
     subject = "Добавление продукта"
     html_content = f"""

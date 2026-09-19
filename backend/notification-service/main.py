@@ -3,7 +3,7 @@ import asyncio
 import logging
 import sys
 
-from src.consumer import RabbitMQConsumer
+from src.consumer import app
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,17 +15,9 @@ logger = logging.getLogger("main")
 
 
 async def main():
-    consumer = RabbitMQConsumer()
-    try:
-        await consumer.start_consuming()
-        await asyncio.Future()
-    finally:
-        await consumer.close()
-        logger.info("Соединения с RabbitMQ успешно закрыты.")
+    logger.info("Запускается notification consumer")
+    await app.run()
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Сервис остановлен пользователем.")
+    asyncio.run(main())
