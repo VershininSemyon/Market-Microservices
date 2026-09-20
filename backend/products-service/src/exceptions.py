@@ -16,5 +16,5 @@ class ProductNotFoundError(ProductError):
 
 
 class ProductAlreadyExistsError(ProductError):
-    status_code: int = 400
+    status_code: int = 409
     detail: str = "Продукт с таким названием уже существует"

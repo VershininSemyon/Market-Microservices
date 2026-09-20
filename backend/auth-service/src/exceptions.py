@@ -59,10 +59,10 @@ class UserCreateError(AuthError):
 
 
 class UsernameAlreadyExistsError(UserCreateError):
-    status_code: int = 400
+    status_code: int = 409
     detail: str = "Пользователь с таким username уже существует"
 
 
 class EmailAlreadyExistsError(UserCreateError):
-    status_code: int = 400
+    status_code: int = 409
     detail: str = "Пользователь с таким email уже существует"

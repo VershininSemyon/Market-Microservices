@@ -86,7 +86,7 @@ services:
     networks:
       - app_net
     depends_on:
-      reviews-postgres:
+      analytics-postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -135,6 +135,9 @@ services:
       - ./nginx/logs:/var/log/nginx
     depends_on:
       - auth-backend
+      - products-backend
+      - reviews-backend
+      - analytics-backend
     networks:
       - app_net
 
