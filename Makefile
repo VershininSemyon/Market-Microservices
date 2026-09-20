@@ -2,12 +2,12 @@
 .PHONY: help up down restart build rebuild ps \
 	logs logs-auth logs-products logs-reviews logs-consumer logs-analytics logs-analytics-consumer logs-notification \
 	logs-gateway logs-auth-postgres logs-products-postgres logs-reviews-postgres logs-analytics-postgres \
-	logs-auth-redis logs-products-redis logs-rabbitmq logs-elasticsearch \
+	logs-auth-redis logs-products-redis logs-reviews-redis logs-rabbitmq logs-elasticsearch \
 	logs-grafana logs-prometheus logs-mailhog logs-adminer logs-redis-monitoring \
 	logs-elasticvue \
 	sh-auth sh-products sh-reviews sh-consumer sh-analytics sh-analytics-consumer sh-notification \
 	psql-auth psql-products psql-reviews psql-analytics \
-	redis-auth redis-products \
+	redis-auth redis-products redis-reviews \
 	migrate-auth migrate-products migrate-reviews migrate-analytics \
 	migrate-create-auth migrate-create-products migrate-create-reviews migrate-create-analytics \
 	ruff-auth ruff-products ruff-reviews ruff-analytics ruff-all \
@@ -35,6 +35,7 @@ ANALYTICS_DB = analytics-postgres
 
 AUTH_REDIS = auth-redis
 PRODUCTS_REDIS = products-redis
+REVIEWS_REDIS = reviews-redis
 
 
 help:
@@ -62,6 +63,7 @@ help:
 	@echo "  make logs-analytics-postgres"
 	@echo "  make logs-auth-redis"
 	@echo "  make logs-products-redis"
+	@echo "  make logs-reviews-redis"
 	@echo "  make logs-rabbitmq"
 	@echo "  make logs-elasticsearch"
 	@echo "  make logs-prometheus"
@@ -89,6 +91,7 @@ help:
 	@echo "Redis:"
 	@echo "  make redis-auth"
 	@echo "  make redis-products"
+	@echo "  make redis-reviews"
 	@echo ""
 	@echo "Alembic:"
 	@echo "  make migrate-auth"
@@ -174,6 +177,9 @@ logs-auth-redis:
 logs-products-redis:
 	$(COMPOSE) logs -f $(PRODUCTS_REDIS)
 
+logs-reviews-redis:
+	$(COMPOSE) logs -f $(REVIEWS_REDIS)
+
 logs-rabbitmq:
 	$(COMPOSE) logs -f rabbitmq
 
@@ -245,6 +251,9 @@ redis-auth:
 
 redis-products:
 	$(COMPOSE) exec $(PRODUCTS_REDIS) sh -c 'redis-cli --no-auth-warning -a "$$REDIS_PASSWORD"'
+
+redis-reviews:
+	$(COMPOSE) exec $(REVIEWS_REDIS) sh -c 'redis-cli --no-auth-warning -a "$$REDIS_PASSWORD"'
 
 
 # Alembic
@@ -420,5 +429,6 @@ restart-infra:
 		analytics-postgres \
 		auth-redis \
 		products-redis \
+		reviews-redis \
 		rabbitmq \
 		elasticsearch

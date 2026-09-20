@@ -5,6 +5,7 @@ from src.config import settings
 from src.exceptions import ReviewAlreadyExistsError, ReviewNotFoundError, ReviewOwnershipError
 from src.producer import rabbitmq_producer
 from src.products_api_client import check_product_exists
+from src.redis_cache_backend import redis_cache
 from src.schemas import ReviewCreateSchema, ReviewListResponseSchema, ReviewReadSchema, ReviewUpdateSchema
 from src.unitofwork import UnitOfWork
 
@@ -12,6 +13,9 @@ from src.unitofwork import UnitOfWork
 class ReviewService:
     def __init__(self, uow: UnitOfWork):
         self.uow = uow
+
+    async def invalidate_review_list_cache(self, product_id: str) -> None:
+        await redis_cache.del_key(f"reviews:{product_id}:list")
 
     async def create_review(self, data: ReviewCreateSchema, user_id: str, user_email: str) -> ReviewReadSchema:
         async with self.uow:
@@ -33,6 +37,7 @@ class ReviewService:
             review = await self.uow.review_repo.create_review(data)
             await self.uow.commit()
 
+        await self.invalidate_review_list_cache(review.product_id)
         await rabbitmq_producer.publish_message(
             routing_key=settings.REVIEW_CREATED_ROUTING_KEY,
             message_body={
@@ -46,12 +51,23 @@ class ReviewService:
     async def get_product_reviews(self, product_id: str) -> ReviewListResponseSchema:
         await check_product_exists(product_id)
 
+        cached = await redis_cache.get_value(f"reviews:{product_id}:list")
+        if cached is not None:
+            return ReviewListResponseSchema.model_validate_json(cached)
+
         async with self.uow:
             reviews = await self.uow.review_repo.get_reviews_by_product_id(product_id)
             product_avg_rating = await self.uow.review_repo.get_product_avg_rating(product_id)
 
         reviews = [ReviewReadSchema.model_validate(review) for review in reviews]
-        return ReviewListResponseSchema(reviews=reviews, avg_rating=product_avg_rating)
+        data = ReviewListResponseSchema(reviews=reviews, avg_rating=product_avg_rating)
+
+        await redis_cache.set_value(
+            f"reviews:{product_id}:list",
+            data.model_dump_json(),
+            3600 * 24 * 7 # неделя
+        )
+        return data
 
     async def get_review_by_id(self, review_id: str) -> ReviewReadSchema:
         async with self.uow:
@@ -75,6 +91,7 @@ class ReviewService:
             await self.uow.review_repo.delete_review(review_id)
             await self.uow.commit()
 
+        await self.invalidate_review_list_cache(review.product_id)
         await rabbitmq_producer.publish_message(
             routing_key=settings.REVIEW_DELETED_ROUTING_KEY,
             message_body={
@@ -97,4 +114,5 @@ class ReviewService:
             updated_review = await self.uow.review_repo.update_review(review_id, data.model_dump())
             await self.uow.commit()
 
+        await self.invalidate_review_list_cache(review.product_id)
         return ReviewReadSchema.model_validate(updated_review)

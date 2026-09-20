@@ -25,6 +25,16 @@ class PostgresSettings(BaseModel):
         return f"postgresql+asyncpg://{self.REVIEWS_SERVICE_POSTGRES_USER}:{self.REVIEWS_SERVICE_POSTGRES_PASSWORD}@{self.REVIEWS_SERVICE_POSTGRES_HOST}:{self.REVIEWS_SERVICE_POSTGRES_PORT}/{self.REVIEWS_SERVICE_POSTGRES_DB_NAME}"
 
 
+class RedisSettings(BaseModel):
+    REVIEWS_SERVICE_REDIS_PASSWORD: str
+    REVIEWS_SERVICE_REDIS_HOST: str = "redis"
+    REVIEWS_SERVICE_REDIS_PORT: int = 6379
+
+    @property
+    def redis_url(self) -> str:
+        return f"redis://:{self.REVIEWS_SERVICE_REDIS_PASSWORD}@{self.REVIEWS_SERVICE_REDIS_HOST}:{self.REVIEWS_SERVICE_REDIS_PORT}/0"
+
+
 class RabbitMQSettings(BaseModel):
     RABBITMQ_USER: str
     RABBITMQ_PASSWORD: str
@@ -53,6 +63,7 @@ class Settings(
     UvicornSettings,
     CorsSettings,
     PostgresSettings,
+    RedisSettings,
     JwtSettings,
     RabbitMQSettings,
     BaseSettings

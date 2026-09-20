@@ -253,6 +253,24 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  
+  reviews-redis:
+    image: redis:8.0-alpine
+    container_name: reviews-redis
+    networks:
+      - app_net
+    volumes:
+      - reviews-redis:/data
+    environment:
+      - REDIS_PASSWORD=${REVIEWS_SERVICE_REDIS_PASSWORD}
+    command: redis-server --requirepass ${REVIEWS_SERVICE_REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "${REVIEWS_SERVICE_REDIS_EXTERNAL_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REVIEWS_SERVICE_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   adminer:
     image: adminer:4.8.1
@@ -383,8 +401,9 @@ volumes:
   products-postgres-data:
   reviews-postgres-data:
   analytics-postgres-data:
-  products-redis:
   auth-redis:
+  products-redis:
+  reviews-redis:
   elasticsearch-data:
   rabbitmq-data:
   prometheus-data:

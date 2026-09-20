@@ -6,6 +6,8 @@ import aio_pika
 
 from src.config import settings
 from src.database import async_session_factory
+from src.redis_manager import redis_manager
+from src.services import ReviewService
 from src.unitofwork import UnitOfWork
 
 logger = logging.getLogger(__name__)
@@ -41,9 +43,15 @@ class RabbitMQConsumer:
                 logger.info(f"Получено событие удаления продукта {product_id}")
 
                 uow = UnitOfWork(async_session_factory)
+                review_service = ReviewService(uow)
+
                 async with uow:
                     await uow.review_repo.delete_product_reviews(product_id)
                     await uow.commit()
+
+                await redis_manager.connect()
+                await review_service.invalidate_review_list_cache(product_id)
+                await redis_manager.disconnect()
 
             except json.JSONDecodeError:
                 logger.error(f"Ошибка декодирования JSON: {message.body}")

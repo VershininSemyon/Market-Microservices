@@ -12,13 +12,16 @@ from src.config import settings
 from src.database import engine
 from src.exceptions import ReviewError
 from src.producer import rabbitmq_producer
+from src.redis_manager import redis_manager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await redis_manager.connect()
     await rabbitmq_producer.connect()
     yield
     await engine.dispose()
+    await redis_manager.disconnect()
     await rabbitmq_producer.close()
 
 
