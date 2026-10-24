@@ -10,3 +10,11 @@ class OrderError(Exception):
 
 
 ###
+class OrderNotFoundError(OrderError):
+    status_code: int = 404
+    detail: str = "Заказ не найден"
+
+
+class OrderOwnershipError(OrderError):
+    status_code: int = 403
+    detail: str = "Вы не являетесь создателем этого заказа"
