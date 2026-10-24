@@ -49,6 +49,9 @@ class RabbitMQSettings(BaseModel):
     PRODUCT_DELETED_ROUTING_KEY: str = "product.deleted"
     PRODUCT_DELETED_QUEUE_NAME: str = "reviews.product-deleted-queue"
 
+    DLX_EXCHANGE_NAME: str = "reviews-dlx"
+    DLQ_NAME: str = "reviews-dlq"
+
     @property
     def amqp_url(self) -> str:
         return f"amqp://{self.RABBITMQ_USER}:{self.RABBITMQ_PASSWORD}@{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/"

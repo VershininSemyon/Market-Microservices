@@ -2,7 +2,7 @@
 import logging
 
 from faststream import FastStream, Logger
-from faststream.rabbit import ExchangeType, RabbitBroker, RabbitExchange, RabbitQueue
+from faststream.rabbit import ExchangeType, RabbitBroker, RabbitExchange, RabbitMessage, RabbitQueue
 
 from src.config import settings
 from src.mail import (
@@ -44,14 +44,46 @@ reviews_exchange = RabbitExchange(
     durable=True
 )
 
+dlx_exchange = RabbitExchange(
+    name=settings.DLX_EXCHANGE_NAME,
+    type=ExchangeType.TOPIC,
+    durable=True
+)
+
+dlq = RabbitQueue(
+    name=settings.DLQ_NAME,
+    durable=True,
+    routing_key="#"
+)
+
+
+def create_queue(name: str, routing_key: str) -> RabbitQueue:
+    return RabbitQueue(
+        name=name,
+        routing_key=routing_key,
+        durable=True,
+        arguments={
+            "x-dead-letter-exchange": settings.DLX_EXCHANGE_NAME,
+        }
+    )
+
 
 @broker.subscriber(
-    queue=RabbitQueue(
-        name=settings.USER_CREATED_QUEUE_NAME,
-        durable=True,
-        routing_key=settings.USER_CREATED_ROUTING_KEY
-    ),
-    exchange=user_exchange,
+    queue=dlq,
+    exchange=dlx_exchange
+)
+async def handle_dlq(
+    body: dict,
+    logger: Logger,
+    message: RabbitMessage
+) -> None:
+    msg_exchange = message.headers.get("x-first-death-exchange")
+    logger.error(f"DLQ Из обменника: {msg_exchange}, тело: {body}")
+
+
+@broker.subscriber(
+    queue=create_queue(settings.USER_CREATED_QUEUE_NAME, settings.USER_CREATED_ROUTING_KEY),
+    exchange=user_exchange
 )
 async def process_user_created(
     msg: UserCreatedMessage,
@@ -62,11 +94,7 @@ async def process_user_created(
 
 
 @broker.subscriber(
-    queue=RabbitQueue(
-        name=settings.USER_DELETED_QUEUE_NAME,
-        durable=True,
-        routing_key=settings.USER_DELETED_ROUTING_KEY
-    ),
+    queue=create_queue(settings.USER_DELETED_QUEUE_NAME, settings.USER_DELETED_ROUTING_KEY),
     exchange=user_exchange,
 )
 async def process_user_deleted(
@@ -78,11 +106,7 @@ async def process_user_deleted(
 
 
 @broker.subscriber(
-    queue=RabbitQueue(
-        name=settings.PRODUCT_CREATED_QUEUE_NAME,
-        durable=True,
-        routing_key=settings.PRODUCT_CREATED_ROUTING_KEY
-    ),
+    queue=create_queue(settings.PRODUCT_CREATED_QUEUE_NAME, settings.PRODUCT_CREATED_ROUTING_KEY),
     exchange=products_exchange,
 )
 async def process_product_created(
@@ -94,11 +118,7 @@ async def process_product_created(
 
 
 @broker.subscriber(
-    queue=RabbitQueue(
-        name=settings.PRODUCT_DELETED_QUEUE_NAME,
-        durable=True,
-        routing_key=settings.PRODUCT_DELETED_ROUTING_KEY
-    ),
+    queue=create_queue(settings.PRODUCT_DELETED_QUEUE_NAME, settings.PRODUCT_DELETED_ROUTING_KEY),
     exchange=products_exchange,
 )
 async def process_product_deleted(
@@ -110,11 +130,7 @@ async def process_product_deleted(
 
 
 @broker.subscriber(
-    queue=RabbitQueue(
-        name=settings.REVIEW_CREATED_QUEUE_NAME,
-        durable=True,
-        routing_key=settings.REVIEW_CREATED_ROUTING_KEY
-    ),
+    queue=create_queue(settings.REVIEW_CREATED_QUEUE_NAME, settings.REVIEW_CREATED_ROUTING_KEY),
     exchange=reviews_exchange,
 )
 async def process_review_created(
@@ -126,11 +142,7 @@ async def process_review_created(
 
 
 @broker.subscriber(
-    queue=RabbitQueue(
-        name=settings.REVIEW_DELETED_QUEUE_NAME,
-        durable=True,
-        routing_key=settings.REVIEW_DELETED_ROUTING_KEY
-    ),
+    queue=create_queue(settings.REVIEW_DELETED_QUEUE_NAME, settings.REVIEW_DELETED_ROUTING_KEY),
     exchange=reviews_exchange,
 )
 async def process_review_deleted(
