@@ -107,6 +107,24 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+  
+  orders-backend:
+    build:
+      context: ./backend/orders-service
+      dockerfile: dockerfile
+    container_name: orders-backend
+    restart: always
+    env_file:
+      - .env
+    expose:
+      - "8005"
+    networks:
+      - app_net
+    depends_on:
+      orders-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   notification-service:
     build:
@@ -217,6 +235,26 @@ services:
       - "${ANALYTICS_SERVICE_POSTGRES_EXTERNAL_PORT}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${ANALYTICS_SERVICE_POSTGRES_USER} -d ${ANALYTICS_SERVICE_POSTGRES_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  orders-postgres:
+    image: postgres:17-alpine
+    container_name: orders-postgres
+    restart: always
+    volumes:
+      - orders-postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${ORDERS_SERVICE_POSTGRES_DB_NAME}
+      POSTGRES_USER: ${ORDERS_SERVICE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${ORDERS_SERVICE_POSTGRES_PASSWORD}
+    networks:
+      - app_net
+    ports:
+      - "${ORDERS_SERVICE_POSTGRES_EXTERNAL_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORDERS_SERVICE_POSTGRES_USER} -d ${ORDERS_SERVICE_POSTGRES_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -404,6 +442,7 @@ volumes:
   products-postgres-data:
   reviews-postgres-data:
   analytics-postgres-data:
+  orders-postgres-data:
   auth-redis:
   products-redis:
   reviews-redis:

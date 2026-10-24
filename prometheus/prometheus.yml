@@ -28,3 +28,7 @@ scrape_configs:
       - targets: ['analytics-backend:8004']
         labels:
           service: 'analytics-service'
+
+      - targets: ['orders-backend:8005']
+        labels:
+          service: 'orders-service'
