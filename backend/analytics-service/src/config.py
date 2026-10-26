@@ -48,6 +48,10 @@ class RabbitMQSettings(BaseModel):
     REVIEW_DELETED_ROUTING_KEY: str = "review.deleted"
     REVIEW_DELETED_QUEUE_NAME: str = "analytics.review-deleted-queue"
 
+    ORDERS_EVENTS_EXCHANGE_NAME: str = "orders-events-exchange"
+    ORDER_CREATED_ROUTING_KEY: str = "order.created"
+    ORDER_CREATED_QUEUE_NAME: str = "analytics.order-created-queue"
+
     DLX_EXCHANGE_NAME: str = "analytics-dlx"
     DLQ_NAME: str = "analytics-dlq"
 

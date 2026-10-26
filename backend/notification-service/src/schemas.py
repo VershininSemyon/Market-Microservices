@@ -24,3 +24,9 @@ class ProductDeletedMessage(BaseModel):
 class ReviewMessage(BaseModel):
     product_id: str
     user_email: EmailStr
+
+
+class OrderCreatedMessage(BaseModel):
+    total_price: float
+    total_amount: int
+    user_email: EmailStr

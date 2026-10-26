@@ -34,6 +34,12 @@ reviews_exchange = RabbitExchange(
     durable=True
 )
 
+orders_exchange = RabbitExchange(
+    name=settings.ORDERS_EVENTS_EXCHANGE_NAME,
+    type=ExchangeType.TOPIC,
+    durable=True
+)
+
 dlx_exchange = RabbitExchange(
     name=settings.DLX_EXCHANGE_NAME,
     type=ExchangeType.TOPIC,
@@ -167,5 +173,21 @@ async def process_review_deleted(
     await analytics_service.add_analytics(
         entity_type=EntityTypeEnum.REVIEW,
         event_type=EventTypeEnum.DELETED,
+        day=msg.event_date
+    )
+
+
+@broker.subscriber(
+    queue=create_queue(settings.ORDER_CREATED_QUEUE_NAME, settings.ORDER_CREATED_ROUTING_KEY),
+    exchange=orders_exchange,
+)
+async def process_order_created(
+    msg: EventDateMessageSchema,
+    logger: Logger,
+) -> None:
+    logger.info("Получено событие создания заказа")
+    await analytics_service.add_analytics(
+        entity_type=EntityTypeEnum.ORDER,
+        event_type=EventTypeEnum.CREATED,
         day=msg.event_date
     )

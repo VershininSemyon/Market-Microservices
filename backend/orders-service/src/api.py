@@ -16,9 +16,22 @@ order_router = APIRouter(prefix="/orders", tags=["Orders"])
 )
 async def get_user_orders(
     orders_service: OrderServiceDep,
-    user: CurrentUserDep
+    user: CurrentUserDep,
 ) -> list[OrderReadSchema]:
     return await orders_service.get_user_orders(user.id)
+
+
+@order_router.post(
+    "/",
+    response_model=OrderReadSchema,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_order(
+    data: OrderCreateSchema,
+    orders_service: OrderServiceDep,
+    user: CurrentUserDep
+) -> OrderReadSchema:
+    return await orders_service.create_order(user.id, user.email, data)
 
 
 @order_router.get(

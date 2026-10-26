@@ -1,7 +1,11 @@
 
+import asyncio
 import uuid
+from datetime import date
 
-from src.exceptions import OrderNotFoundError, OrderOwnershipError
+from src.exceptions import NotEnoughProductQuantityError, OrderNotFoundError, OrderOwnershipError
+from src.producer import OrderCreatedEventPayload, OrderProductEventItem, publish_order_created_event
+from src.products_api_client import get_product
 from src.schemas import OrderCreateSchema, OrderReadSchema
 from src.unitofwork import UnitOfWork
 
@@ -28,3 +32,50 @@ class OrderService:
 
         return OrderReadSchema.model_validate(order)
 
+    async def create_order(self, user_id: uuid.UUID, user_email: str, data: OrderCreateSchema) -> OrderReadSchema:
+        products = {}
+        total_price = 0.0
+        total_amount = 0
+
+        api_products = await asyncio.gather(*(
+            get_product(product_id)
+            for product_id in data.products.keys()
+        ))
+
+        for product, quantity in zip(api_products, data.products.values()):
+            if product["quantity"] < quantity:
+                raise NotEnoughProductQuantityError()
+
+            products[product["id"]] = {
+                "name": product["name"],
+                "price": product["price"],
+                "quantity": quantity
+            }
+
+            total_price += product["price"] * quantity
+            total_amount += quantity
+
+        async with self.uow:
+            order = await self.uow.order_repo.create_order(
+                {
+                    "user_id": user_id,
+                    "products": products,
+                    "total_price": total_price,
+                    "total_amount": total_amount
+                }
+            )
+            await self.uow.commit()
+
+        event_payload = OrderCreatedEventPayload(
+            total_amount=total_amount,
+            total_price=total_price,
+            products=[
+                OrderProductEventItem(id=prod_id, quantity=prod_data["quantity"])
+                for prod_id, prod_data in products.items()
+            ],
+            event_date=str(date.today()),
+            user_email=user_email
+        )
+        await publish_order_created_event(event_payload)
+
+        return OrderReadSchema.model_validate(order)

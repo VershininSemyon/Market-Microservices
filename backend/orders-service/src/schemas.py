@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 OrderTotalPrice = Annotated[float, Field(gt=0)]
 OrderTotalAmount = Annotated[int, Field(ge=0)]
@@ -27,5 +27,16 @@ class OrderReadSchema(BaseModel):
 
 
 class OrderCreateSchema(BaseModel):
-    product_ids: list[uuid.UUID]
-    pass
+    products: dict[uuid.UUID, int]
+
+    @classmethod
+    @field_validator("products")
+    def validate_products(cls, value):
+        if not value:
+            raise ValueError("Список товаров не может быть пустым")
+
+        for product_id, quantity in value.items():
+            if quantity <= 0:
+                raise ValueError(f"Количество товара с id {product_id} должно быть больше нуля")
+
+        return value

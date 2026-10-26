@@ -125,3 +125,17 @@ async def send_review_deleted_email(product_id: str, to_email: str) -> None:
         </html>
     """
     await _send_email(subject=subject, html_content=html_content, to_email=to_email)
+
+
+async def send_order_created_email(total_price: float, total_amount: int, to_email: str) -> None:
+    subject = "Создание заказа"
+    html_content = f"""
+        <html>
+            <body>
+                <h1>Ваш заказ был успешно создан!</h1>
+                <p>Сумма заказа: {total_price}</p>
+                <p>Количество товаров: {total_amount}</p>
+            </body>
+        </html>
+    """
+    await _send_email(subject=subject, html_content=html_content, to_email=to_email)

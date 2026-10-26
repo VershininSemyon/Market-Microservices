@@ -7,6 +7,7 @@ from faststream.rabbit import ExchangeType, RabbitBroker, RabbitExchange, Rabbit
 from src.config import settings
 from src.mail import (
     send_account_deleted_email,
+    send_order_created_email,
     send_product_created_email,
     send_product_deleted_email,
     send_review_created_email,
@@ -14,6 +15,7 @@ from src.mail import (
     send_welcome_email,
 )
 from src.schemas import (
+    OrderCreatedMessage,
     ProductCreatedMessage,
     ProductDeletedMessage,
     ReviewMessage,
@@ -40,6 +42,12 @@ products_exchange = RabbitExchange(
 
 reviews_exchange = RabbitExchange(
     name=settings.REVIEWS_EVENTS_EXCHANGE_NAME,
+    type=ExchangeType.TOPIC,
+    durable=True
+)
+
+order_exchange = RabbitExchange(
+    name=settings.ORDERS_EVENTS_EXCHANGE_NAME,
     type=ExchangeType.TOPIC,
     durable=True
 )
@@ -151,3 +159,15 @@ async def process_review_deleted(
 ) -> None:
     logger.info(f"Получено событие удаления отзыва для продукта {msg.product_id} ({msg.user_email})")
     await send_review_deleted_email(product_id=msg.product_id, to_email=msg.user_email)
+
+
+@broker.subscriber(
+    queue=create_queue(settings.ORDER_CREATED_QUEUE_NAME, settings.ORDER_CREATED_ROUTING_KEY),
+    exchange=order_exchange,
+)
+async def process_order_created(
+    msg: OrderCreatedMessage,
+    logger: Logger,
+) -> None:
+    logger.info(f"Получено событие создания заказа: {msg.total_price} ({msg.user_email})")
+    await send_order_created_email(total_price=msg.total_price, total_amount=msg.total_amount, to_email=msg.user_email)

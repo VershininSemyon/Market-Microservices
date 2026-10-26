@@ -11,12 +11,15 @@ from src.api import order_router
 from src.config import settings
 from src.database import engine
 from src.exceptions import OrderError
+from src.producer import broker
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await broker.start()
     yield
     await engine.dispose()
+    await broker.close()
 
 
 app = FastAPI(
