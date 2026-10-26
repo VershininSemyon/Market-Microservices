@@ -1,21 +1,22 @@
 
 .PHONY: help up down restart build rebuild ps \
 	logs logs-auth logs-products logs-reviews logs-consumer logs-analytics logs-analytics-consumer logs-notification \
-	logs-gateway logs-auth-postgres logs-products-postgres logs-reviews-postgres logs-analytics-postgres \
+	logs-gateway logs-auth-postgres logs-products-postgres logs-reviews-postgres logs-analytics-postgres logs-orders-postgres \
 	logs-auth-redis logs-products-redis logs-reviews-redis logs-rabbitmq logs-elasticsearch \
 	logs-grafana logs-prometheus logs-mailhog logs-adminer logs-redis-monitoring \
 	logs-elasticvue \
 	sh-auth sh-products sh-reviews sh-consumer sh-analytics sh-analytics-consumer sh-notification \
-	psql-auth psql-products psql-reviews psql-analytics \
+	sh-orders \
+	psql-auth psql-products psql-reviews psql-analytics psql-orders \
 	redis-auth redis-products redis-reviews \
-	migrate-auth migrate-products migrate-reviews migrate-analytics \
-	migrate-create-auth migrate-create-products migrate-create-reviews migrate-create-analytics \
-	ruff-auth ruff-products ruff-reviews ruff-analytics ruff-all \
-	mypy-auth mypy-products mypy-reviews mypy-analytics mypy-all \
-	lint-auth lint-products lint-reviews lint-analytics lint-all \
-	up-auth up-products up-reviews up-analytics up-notification \
-	down-auth down-products down-reviews down-analytics down-notification \
-	restart-auth restart-products restart-reviews restart-analytics restart-notification \
+	migrate-auth migrate-products migrate-reviews migrate-analytics migrate-orders \
+	migrate-create-auth migrate-create-products migrate-create-reviews migrate-create-analytics migrate-create-orders \
+	ruff-auth ruff-products ruff-reviews ruff-analytics ruff-orders ruff-all \
+	mypy-auth mypy-products mypy-reviews mypy-analytics mypy-orders mypy-all \
+	lint-auth lint-products lint-reviews lint-analytics lint-orders lint-all \
+	up-auth up-products up-reviews up-analytics up-orders up-notification \
+	down-auth down-products down-reviews down-analytics down-orders down-notification \
+	restart-auth restart-products restart-reviews restart-analytics restart-orders restart-notification \
 	restart-infra
 
 COMPOSE = docker compose
@@ -26,12 +27,14 @@ REVIEWS = reviews-backend
 CONSUMER = reviews-consumer
 ANALYTICS = analytics-backend
 ANALYTICS_CONSUMER = analytics-consumer
+ORDERS = orders-backend
 NOTIFICATION = notification-service
 
 AUTH_DB = auth-postgres
 PRODUCTS_DB = products-postgres
 REVIEWS_DB = reviews-postgres
 ANALYTICS_DB = analytics-postgres
+ORDERS_DB = orders-postgres
 
 AUTH_REDIS = auth-redis
 PRODUCTS_REDIS = products-redis
@@ -55,12 +58,14 @@ help:
 	@echo "  make logs-consumer      - reviews-consumer"
 	@echo "  make logs-analytics     - analytics-backend"
 	@echo "  make logs-analytics-consumer - analytics-consumer"
+	@echo "  make logs-orders        - orders-backend"
 	@echo "  make logs-notification  - notification-service"
 	@echo "  make logs-gateway       - api-gateway"
 	@echo "  make logs-auth-postgres"
 	@echo "  make logs-products-postgres"
 	@echo "  make logs-reviews-postgres"
 	@echo "  make logs-analytics-postgres"
+	@echo "  make logs-orders-postgres"
 	@echo "  make logs-auth-redis"
 	@echo "  make logs-products-redis"
 	@echo "  make logs-reviews-redis"
@@ -80,6 +85,7 @@ help:
 	@echo "  make sh-consumer"
 	@echo "  make sh-analytics"
 	@echo "  make sh-analytics-consumer"
+	@echo "  make sh-orders"
 	@echo "  make sh-notification"
 	@echo ""
 	@echo "PostgreSQL:"
@@ -87,6 +93,7 @@ help:
 	@echo "  make psql-products"
 	@echo "  make psql-reviews"
 	@echo "  make psql-analytics"
+	@echo "  make psql-orders"
 	@echo ""
 	@echo "Redis:"
 	@echo "  make redis-auth"
@@ -98,10 +105,12 @@ help:
 	@echo "  make migrate-products"
 	@echo "  make migrate-reviews"
 	@echo "  make migrate-analytics"
+	@echo "  make migrate-orders"
 	@echo "  make migrate-create-auth"
 	@echo "  make migrate-create-products"
 	@echo "  make migrate-create-reviews"
 	@echo "  make migrate-create-analytics"
+	@echo "  make migrate-create-orders"
 	@echo ""
 	@echo "Проверки:"
 	@echo "  make ruff-all"
@@ -153,6 +162,9 @@ logs-analytics:
 logs-analytics-consumer:
 	$(COMPOSE) logs -f $(ANALYTICS_CONSUMER)
 
+logs-orders:
+	$(COMPOSE) logs -f $(ORDERS)
+
 logs-notification:
 	$(COMPOSE) logs -f $(NOTIFICATION)
 
@@ -170,6 +182,9 @@ logs-reviews-postgres:
 
 logs-analytics-postgres:
 	$(COMPOSE) logs -f $(ANALYTICS_DB)
+
+logs-orders-postgres:
+	$(COMPOSE) logs -f $(ORDERS_DB)
 
 logs-auth-redis:
 	$(COMPOSE) logs -f $(AUTH_REDIS)
@@ -225,6 +240,9 @@ sh-analytics:
 sh-analytics-consumer:
 	$(COMPOSE) exec $(ANALYTICS_CONSUMER) sh
 
+sh-orders:
+	$(COMPOSE) exec $(ORDERS) sh
+
 sh-notification:
 	$(COMPOSE) exec $(NOTIFICATION) sh
 
@@ -242,6 +260,9 @@ psql-reviews:
 
 psql-analytics:
 	$(COMPOSE) exec $(ANALYTICS_DB) sh -c 'PGPASSWORD="$$POSTGRES_PASSWORD" psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+psql-orders:
+	$(COMPOSE) exec $(ORDERS_DB) sh -c 'PGPASSWORD="$$POSTGRES_PASSWORD" psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
 
 
 # Redis
@@ -270,6 +291,9 @@ migrate-reviews:
 migrate-analytics:
 	$(COMPOSE) exec $(ANALYTICS) alembic upgrade head
 
+migrate-orders:
+	$(COMPOSE) exec $(ORDERS) alembic upgrade head
+
 
 migrate-create-auth:
 	@read -p "Migration message: " message; \
@@ -291,6 +315,11 @@ migrate-create-analytics:
 	$(COMPOSE) exec $(ANALYTICS) \
 	alembic revision --autogenerate -m "$$message"
 
+migrate-create-orders:
+	@read -p "Migration message: " message; \
+	$(COMPOSE) exec $(ORDERS) \
+	alembic revision --autogenerate -m "$$message"
+
 
 # Ruff
 
@@ -306,6 +335,9 @@ ruff-reviews:
 ruff-analytics:
 	$(COMPOSE) exec $(ANALYTICS) ruff check .
 
+ruff-orders:
+	$(COMPOSE) exec $(ORDERS) ruff check .
+
 ruff-notification:
 	$(COMPOSE) exec $(NOTIFICATION) ruff check .
 
@@ -314,6 +346,7 @@ ruff-all:
 	$(COMPOSE) exec $(PRODUCTS) ruff check .
 	$(COMPOSE) exec $(REVIEWS) ruff check .
 	$(COMPOSE) exec $(ANALYTICS) ruff check .
+	$(COMPOSE) exec $(ORDERS) ruff check .
 	$(COMPOSE) exec $(NOTIFICATION) ruff check .
 
 
@@ -331,6 +364,9 @@ mypy-reviews:
 mypy-analytics:
 	$(COMPOSE) exec $(ANALYTICS) mypy .
 
+mypy-orders:
+	$(COMPOSE) exec $(ORDERS) mypy .
+
 mypy-notification:
 	$(COMPOSE) exec $(NOTIFICATION) mypy .
 
@@ -339,6 +375,7 @@ mypy-all:
 	$(COMPOSE) exec $(PRODUCTS) mypy .
 	$(COMPOSE) exec $(REVIEWS) mypy .
 	$(COMPOSE) exec $(ANALYTICS) mypy .
+	$(COMPOSE) exec $(ORDERS) mypy .
 	$(COMPOSE) exec $(NOTIFICATION) mypy .
 
 
@@ -359,6 +396,10 @@ lint-reviews:
 lint-analytics:
 	$(MAKE) ruff-analytics
 	$(MAKE) mypy-analytics
+
+lint-orders:
+	$(MAKE) ruff-orders
+	$(MAKE) mypy-orders
 
 lint-notification:
 	$(MAKE) ruff-notification
@@ -383,6 +424,9 @@ up-reviews:
 up-analytics:
 	$(COMPOSE) up -d analytics-backend
 
+up-orders:
+	$(COMPOSE) up -d orders-backend
+
 up-notification:
 	$(COMPOSE) up -d notification-service
 
@@ -398,6 +442,9 @@ down-reviews:
 
 down-analytics:
 	$(COMPOSE) stop analytics-backend
+
+down-orders:
+	$(COMPOSE) stop orders-backend
 
 down-notification:
 	$(COMPOSE) stop notification-service
@@ -415,6 +462,9 @@ restart-reviews:
 restart-analytics:
 	$(COMPOSE) restart analytics-backend
 
+restart-orders:
+	$(COMPOSE) restart orders-backend
+
 restart-notification:
 	$(COMPOSE) restart notification-service
 
@@ -427,6 +477,7 @@ restart-infra:
 		products-postgres \
 		reviews-postgres \
 		analytics-postgres \
+		orders-postgres \
 		auth-redis \
 		products-redis \
 		reviews-redis \

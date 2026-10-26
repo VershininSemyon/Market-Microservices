@@ -312,6 +312,60 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  
+  elasticsearch:
+    image: elasticsearch:8.12.2
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - http.cors.enabled=true
+      - http.cors.allow-origin="http://localhost:5601,http://127.0.0.1:5601"
+      - http.cors.allow-headers=X-Requested-With,Content-Type,Content-Length,Authorization
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-u", "${ELASTIC_USER}:${ELASTIC_PASSWORD}", "http://localhost:9200/_cluster/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+  
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+  
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: mailhog
+    restart: always
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - app_net
 
   adminer:
     image: adminer:4.8.1
@@ -332,6 +386,18 @@ services:
       - "5540:5540"
     networks:
       - app_net
+  
+  elasticvue:
+    image: cars10/elasticvue:1.15.0
+    container_name: elasticvue
+    restart: always
+    ports:
+      - "5601:8080"
+    networks:
+      - app_net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
 
   prometheus:
     image: prom/prometheus:v2.52.0
@@ -370,72 +436,6 @@ services:
       - app_net
     depends_on:
       - prometheus
-
-  elasticsearch:
-    image: elasticsearch:8.12.2
-    container_name: elasticsearch
-    restart: always
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=true
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - http.cors.enabled=true
-      - http.cors.allow-origin="http://localhost:5601,http://127.0.0.1:5601"
-      - http.cors.allow-headers=X-Requested-With,Content-Type,Content-Length,Authorization
-    volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
-    networks:
-      - app_net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "-u", "${ELASTIC_USER}:${ELASTIC_PASSWORD}", "http://localhost:9200/_cluster/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  elasticvue:
-    image: cars10/elasticvue:1.15.0
-    container_name: elasticvue
-    restart: always
-    ports:
-      - "5601:8080"
-    networks:
-      - app_net
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-  
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: rabbitmq
-    restart: always
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    networks:
-      - app_net
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-  
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
-    container_name: mailhog
-    restart: always
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-    networks:
-      - app_net
 
 volumes:
   auth-postgres-data:
