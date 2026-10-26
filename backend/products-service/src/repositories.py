@@ -83,3 +83,13 @@ class ProductRepository:
         ))
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def change_product_quantity(self, product_id: str, quantity_change: int) -> ProductORM:
+        stmt = (
+            update(ProductORM)
+            .where(ProductORM.id == product_id)
+            .values(quantity=ProductORM.quantity + quantity_change)
+            .returning(ProductORM)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

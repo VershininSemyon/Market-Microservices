@@ -17,7 +17,7 @@ class ProductService:
     def __init__(self, uow: UnitOfWork):
         self.uow = uow
 
-    async def _invalidate_products_cache(self, product_id: str | None = None):
+    async def invalidate_products_cache(self, product_id: str | None = None):
         await redis_cache.del_key("products:list")
         if product_id is not None:
             await redis_cache.del_key(f"products:{product_id}")
@@ -31,7 +31,7 @@ class ProductService:
             product = await self.uow.product_repo.create_product(data.model_dump())
             await self.uow.commit()
 
-        await self._invalidate_products_cache()
+        await self.invalidate_products_cache()
         await index_product(product.id, product.name, product.description)
         await rabbitmq_producer.publish_message(
             routing_key=settings.PRODUCT_CREATED_ROUTING_KEY,
@@ -97,7 +97,7 @@ class ProductService:
             await self.uow.product_repo.delete_product(product_id)
             await self.uow.commit()
 
-        await self._invalidate_products_cache(product_id)
+        await self.invalidate_products_cache(product_id)
         await delete_product_index(product_id)
         await rabbitmq_producer.publish_message(
             routing_key=settings.PRODUCT_DELETED_ROUTING_KEY,
@@ -139,6 +139,6 @@ class ProductService:
                 raise ProductNotFoundError()
             await self.uow.commit()
 
-        await self._invalidate_products_cache(product_id)
+        await self.invalidate_products_cache(product_id)
         await index_product(product.id, product.name, product.description)
         return ProductReadSchema.model_validate(product)

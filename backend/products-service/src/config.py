@@ -57,6 +57,13 @@ class RabbitMQSettings(BaseModel):
     PRODUCT_CREATED_ROUTING_KEY: str = "product.created"
     PRODUCT_DELETED_ROUTING_KEY: str = "product.deleted"
 
+    ORDERS_EVENTS_EXCHANGE_NAME: str = "orders-events-exchange"
+    ORDER_CREATED_ROUTING_KEY: str = "order.created"
+    ORDER_CREATED_QUEUE_NAME: str = "products.order-created-queue"
+
+    DLX_EXCHANGE_NAME: str = "analytics-dlx"
+    DLQ_NAME: str = "analytics-dlq"
+
     @property
     def amqp_url(self) -> str:
         return f"amqp://{self.RABBITMQ_USER}:{self.RABBITMQ_PASSWORD}@{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/"
