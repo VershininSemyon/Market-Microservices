@@ -1,12 +1,10 @@
+import { AuthProvider } from './contexts/AuthContext';
+import AppBody from './pages/AppBody';
 
-
-function App() {
-
-  return (
-    <>
-        Frontend
-    </>
-  )
+export default function App() {
+    return (
+        <AuthProvider>
+            <AppBody />
+        </AuthProvider>
+    );
 }
-
-export default App
