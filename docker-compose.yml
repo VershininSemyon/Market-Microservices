@@ -1,18 +1,18 @@
 
 services:
-  frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "5000:80"
-    depends_on:
-      - auth-backend
-      - products-backend
-      - reviews-backend
-      - analytics-backend
-      - orders-backend
-    networks:
-      - app_net
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #   ports:
+  #     - "5000:80"
+  #   depends_on:
+  #     - auth-backend
+  #     - products-backend
+  #     - reviews-backend
+  #     - analytics-backend
+  #     - orders-backend
+  #   networks:
+      # - app_net
 
   auth-backend:
     build:
@@ -149,6 +149,23 @@ services:
       - .env
     expose:
       - "8005"
+    networks:
+      - app_net
+    depends_on:
+      orders-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  orders-outbox-scheduler:
+    build:
+      context: ./backend/orders-service
+      dockerfile: dockerfile
+    container_name: orders-outbox-scheduler
+    restart: always
+    env_file:
+      - .env
+    command: ["python", "src/outbox_scheduler.py"]
     networks:
       - app_net
     depends_on:

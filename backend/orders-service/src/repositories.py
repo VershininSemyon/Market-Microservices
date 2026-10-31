@@ -2,7 +2,7 @@
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import OrderORM
+from src.models import OrderORM, OutboxEventORM
 
 
 class OrderRepository:
@@ -21,5 +21,20 @@ class OrderRepository:
 
     async def get_orders_by_user_id(self, user_id: str):
         stmt = select(OrderORM).where(OrderORM.user_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+
+class OutboxEventRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create_outbox_event(self, data: dict) -> OutboxEventORM:
+        stmt = insert(OutboxEventORM).values(**data).returning(OutboxEventORM)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_last_outbox_events(self, limit: int = 10) -> list[OutboxEventORM]:
+        stmt = select(OutboxEventORM).limit(limit)
         result = await self.session.execute(stmt)
         return result.scalars().all()
