@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     await broker.start()
     yield
     await engine.dispose()
-    await broker.close()
+    await broker.stop()
 
 
 app = FastAPI(

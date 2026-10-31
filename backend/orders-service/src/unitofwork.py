@@ -1,5 +1,5 @@
 
-from src.repositories import OrderRepository
+from src.repositories import OrderRepository, OutboxEventRepository
 
 
 class UnitOfWork:
@@ -9,6 +9,7 @@ class UnitOfWork:
     async def __aenter__(self):
         self.session = self.session_factory()
         self.order_repo = OrderRepository(self.session)
+        self.outbox_repo = OutboxEventRepository(self.session)
 
     async def __aexit__(self, exc_type, exc, tb):
         try:

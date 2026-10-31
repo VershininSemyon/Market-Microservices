@@ -14,6 +14,7 @@ class OrderProductEventItem(BaseModel):
 
 
 class OrderCreatedEventPayload(BaseModel):
+    event_id: uuid.UUID
     total_amount: int
     total_price: float
     products: list[OrderProductEventItem]
