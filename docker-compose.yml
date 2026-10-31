@@ -165,7 +165,7 @@ services:
     restart: always
     env_file:
       - .env
-    command: ["python", "src/outbox_scheduler.py"]
+    command: ["python", "-m", "src.outbox_scheduler"]
     networks:
       - app_net
     depends_on:
