@@ -7,6 +7,7 @@ import aio_pika
 
 from src.config import settings
 from src.database import async_session_factory
+from src.redis_cache_backend import redis_cache
 from src.redis_manager import redis_manager
 from src.services import ProductService
 from src.unitofwork import UnitOfWork
@@ -51,6 +52,19 @@ class RabbitMQConsumer:
     async def process_order_created(self, message: aio_pika.IncomingMessage) -> None:
         try:
             body = json.loads(message.body.decode("utf-8"))
+            event_id = body.get("event_id")
+
+            if not event_id:
+                logger.warning(f"Некорректный формат сообщения (нет event_id): {body}")
+                await message.nack(requeue=False)
+                return
+
+            event_cache = await redis_cache.get_value(f"events:{event_id}")
+
+            if event_cache == "done":
+                await message.ack()
+                return
+
             products = body.get("products")
 
             if not products:
@@ -80,6 +94,7 @@ class RabbitMQConsumer:
                 )
 
             await asyncio.gather(*tasks)
+            await redis_cache.set_value(f"events:{event_id}", "done")
             await message.ack()
 
         except json.JSONDecodeError:

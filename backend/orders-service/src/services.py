@@ -5,11 +5,10 @@ from datetime import date
 
 from src.config import settings
 from src.exceptions import NotEnoughProductQuantityError, OrderNotFoundError, OrderOwnershipError
-from src.producer import OrderCreatedEventPayload, OrderProductEventItem, publish_order_created_event
+from src.models import ExchangeTypeEnum
 from src.products_api_client import get_product
 from src.schemas import OrderCreateSchema, OrderReadSchema
 from src.unitofwork import UnitOfWork
-from src.models import ExchangeTypeEnum
 
 
 class OrderService:
@@ -72,6 +71,7 @@ class OrderService:
                 "exchange_type": ExchangeTypeEnum.TOPIC,
                 "routing_key": settings.ORDER_CREATED_ROUTING_KEY,
                 "event_payload": {
+                    "event_id": str(uuid.uuid4()),
                     "total_amount": total_amount,
                     "total_price": total_price,
                     "products": [
@@ -90,16 +90,4 @@ class OrderService:
 
             await self.uow.commit()
 
-        # event_payload = OrderCreatedEventPayload(
-        #     total_amount=total_amount,
-        #     total_price=total_price,
-        #     products=[
-        #         OrderProductEventItem(id=prod_id, quantity=prod_data["quantity"])
-        #         for prod_id, prod_data in products.items()
-        #     ],
-        #     event_date=str(date.today()),
-        #     user_email=user_email
-        # )
-
-        # await publish_order_created_event(event_payload)
         return OrderReadSchema.model_validate(order)
