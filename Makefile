@@ -1,19 +1,18 @@
 
 .PHONY: help up down restart build rebuild ps \
-	logs logs-auth logs-products logs-reviews logs-consumer logs-analytics logs-analytics-consumer logs-notification \
+	logs logs-auth logs-products logs-reviews logs-consumer logs-products-consumer logs-analytics logs-analytics-consumer logs-orders logs-orders-outbox logs-notification \
 	logs-gateway logs-auth-postgres logs-products-postgres logs-reviews-postgres logs-analytics-postgres logs-orders-postgres \
 	logs-auth-redis logs-products-redis logs-reviews-redis logs-rabbitmq logs-elasticsearch \
 	logs-grafana logs-prometheus logs-mailhog logs-adminer logs-redis-monitoring \
 	logs-elasticvue \
-	sh-auth sh-products sh-reviews sh-consumer sh-analytics sh-analytics-consumer sh-notification \
-	sh-orders \
+	sh-auth sh-products sh-reviews sh-consumer sh-products-consumer sh-analytics sh-analytics-consumer sh-orders sh-orders-outbox sh-notification \
 	psql-auth psql-products psql-reviews psql-analytics psql-orders \
 	redis-auth redis-products redis-reviews \
 	migrate-auth migrate-products migrate-reviews migrate-analytics migrate-orders \
 	migrate-create-auth migrate-create-products migrate-create-reviews migrate-create-analytics migrate-create-orders \
-	ruff-auth ruff-products ruff-reviews ruff-analytics ruff-orders ruff-all \
-	mypy-auth mypy-products mypy-reviews mypy-analytics mypy-orders mypy-all \
-	lint-auth lint-products lint-reviews lint-analytics lint-orders lint-all \
+	ruff-auth ruff-products ruff-reviews ruff-analytics ruff-orders ruff-notification ruff-all \
+	mypy-auth mypy-products mypy-reviews mypy-analytics mypy-orders mypy-notification mypy-all \
+	lint-auth lint-products lint-reviews lint-analytics lint-orders lint-notification lint-all \
 	up-auth up-products up-reviews up-analytics up-orders up-notification \
 	down-auth down-products down-reviews down-analytics down-orders down-notification \
 	restart-auth restart-products restart-reviews restart-analytics restart-orders restart-notification \
@@ -25,9 +24,11 @@ AUTH = auth-backend
 PRODUCTS = products-backend
 REVIEWS = reviews-backend
 CONSUMER = reviews-consumer
+PRODUCTS_CONSUMER = products-consumer
 ANALYTICS = analytics-backend
 ANALYTICS_CONSUMER = analytics-consumer
 ORDERS = orders-backend
+ORDERS_OUTBOX = orders-outbox-scheduler
 NOTIFICATION = notification-service
 
 AUTH_DB = auth-postgres
@@ -56,9 +57,11 @@ help:
 	@echo "  make logs-products      - products-backend"
 	@echo "  make logs-reviews       - reviews-backend"
 	@echo "  make logs-consumer      - reviews-consumer"
+	@echo "  make logs-products-consumer - products-consumer"
 	@echo "  make logs-analytics     - analytics-backend"
 	@echo "  make logs-analytics-consumer - analytics-consumer"
 	@echo "  make logs-orders        - orders-backend"
+	@echo "  make logs-orders-outbox - orders-outbox-scheduler"
 	@echo "  make logs-notification  - notification-service"
 	@echo "  make logs-gateway       - api-gateway"
 	@echo "  make logs-auth-postgres"
@@ -83,9 +86,11 @@ help:
 	@echo "  make sh-products"
 	@echo "  make sh-reviews"
 	@echo "  make sh-consumer"
+	@echo "  make sh-products-consumer"
 	@echo "  make sh-analytics"
 	@echo "  make sh-analytics-consumer"
 	@echo "  make sh-orders"
+	@echo "  make sh-orders-outbox"
 	@echo "  make sh-notification"
 	@echo ""
 	@echo "PostgreSQL:"
@@ -156,6 +161,9 @@ logs-reviews:
 logs-consumer:
 	$(COMPOSE) logs -f $(CONSUMER)
 
+logs-products-consumer:
+	$(COMPOSE) logs -f $(PRODUCTS_CONSUMER)
+
 logs-analytics:
 	$(COMPOSE) logs -f $(ANALYTICS)
 
@@ -164,6 +172,9 @@ logs-analytics-consumer:
 
 logs-orders:
 	$(COMPOSE) logs -f $(ORDERS)
+
+logs-orders-outbox:
+	$(COMPOSE) logs -f $(ORDERS_OUTBOX)
 
 logs-notification:
 	$(COMPOSE) logs -f $(NOTIFICATION)
@@ -234,6 +245,9 @@ sh-reviews:
 sh-consumer:
 	$(COMPOSE) exec $(CONSUMER) sh
 
+sh-products-consumer:
+	$(COMPOSE) exec $(PRODUCTS_CONSUMER) sh
+
 sh-analytics:
 	$(COMPOSE) exec $(ANALYTICS) sh
 
@@ -242,6 +256,9 @@ sh-analytics-consumer:
 
 sh-orders:
 	$(COMPOSE) exec $(ORDERS) sh
+
+sh-orders-outbox:
+	$(COMPOSE) exec $(ORDERS_OUTBOX) sh
 
 sh-notification:
 	$(COMPOSE) exec $(NOTIFICATION) sh
@@ -413,73 +430,73 @@ lint-all:
 # Individual services
 
 up-auth:
-	$(COMPOSE) up -d auth-backend
+	$(COMPOSE) up -d $(AUTH)
 
 up-products:
-	$(COMPOSE) up -d products-backend
+	$(COMPOSE) up -d $(PRODUCTS)
 
 up-reviews:
-	$(COMPOSE) up -d reviews-backend
+	$(COMPOSE) up -d $(REVIEWS)
 
 up-analytics:
-	$(COMPOSE) up -d analytics-backend
+	$(COMPOSE) up -d $(ANALYTICS)
 
 up-orders:
-	$(COMPOSE) up -d orders-backend
+	$(COMPOSE) up -d $(ORDERS)
 
 up-notification:
-	$(COMPOSE) up -d notification-service
+	$(COMPOSE) up -d $(NOTIFICATION)
 
 
 down-auth:
-	$(COMPOSE) stop auth-backend
+	$(COMPOSE) stop $(AUTH)
 
 down-products:
-	$(COMPOSE) stop products-backend
+	$(COMPOSE) stop $(PRODUCTS)
 
 down-reviews:
-	$(COMPOSE) stop reviews-backend
+	$(COMPOSE) stop $(REVIEWS)
 
 down-analytics:
-	$(COMPOSE) stop analytics-backend
+	$(COMPOSE) stop $(ANALYTICS)
 
 down-orders:
-	$(COMPOSE) stop orders-backend
+	$(COMPOSE) stop $(ORDERS)
 
 down-notification:
-	$(COMPOSE) stop notification-service
+	$(COMPOSE) stop $(NOTIFICATION)
 
 
 restart-auth:
-	$(COMPOSE) restart auth-backend
+	$(COMPOSE) restart $(AUTH)
 
 restart-products:
-	$(COMPOSE) restart products-backend
+	$(COMPOSE) restart $(PRODUCTS)
 
 restart-reviews:
-	$(COMPOSE) restart reviews-backend
+	$(COMPOSE) restart $(REVIEWS)
 
 restart-analytics:
-	$(COMPOSE) restart analytics-backend
+	$(COMPOSE) restart $(ANALYTICS)
 
 restart-orders:
-	$(COMPOSE) restart orders-backend
+	$(COMPOSE) restart $(ORDERS)
 
 restart-notification:
-	$(COMPOSE) restart notification-service
+	$(COMPOSE) restart $(NOTIFICATION)
 
 
 # Infrastructure
 
 restart-infra:
 	$(COMPOSE) restart \
-		auth-postgres \
-		products-postgres \
-		reviews-postgres \
-		analytics-postgres \
-		orders-postgres \
-		auth-redis \
-		products-redis \
-		reviews-redis \
+		$(AUTH_DB) \
+		$(PRODUCTS_DB) \
+		$(REVIEWS_DB) \
+		$(ANALYTICS_DB) \
+		$(ORDERS_DB) \
+		$(AUTH_REDIS) \
+		$(PRODUCTS_REDIS) \
+		$(REVIEWS_REDIS) \
 		rabbitmq \
 		elasticsearch
