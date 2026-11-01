@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, Integer, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
@@ -12,7 +12,7 @@ class ProductORM(Base):
     __tablename__ = "products"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     price: Mapped[float] = mapped_column(Float, nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -21,5 +21,12 @@ class ProductORM(Base):
 
     __table_args__ = (
         CheckConstraint("price > 0", name="check_price_positive"),
-        CheckConstraint("quantity >= 0", name="check_quantity_non_negative")
+        CheckConstraint("quantity >= 0", name="check_quantity_non_negative"),
+
+        Index(
+            "unique_product_name_active",
+            "name",
+            unique=True,
+            postgresql_where="is_active = true"
+        ),
     )

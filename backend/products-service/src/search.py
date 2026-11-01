@@ -75,9 +75,10 @@ async def delete_product_index(product_id: UUID):
     )
 
 
-async def search_product(query: str):
+async def search_product(query: str, limit: int):
     result = await es.search(
         index=settings.PRODUCTS_INDEX,
+        size=limit,
         body={
             "query": {
                 "bool": {

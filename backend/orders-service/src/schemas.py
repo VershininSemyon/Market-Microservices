@@ -29,8 +29,8 @@ class OrderReadSchema(BaseModel):
 class OrderCreateSchema(BaseModel):
     products: dict[uuid.UUID, int]
 
-    @classmethod
     @field_validator("products")
+    @classmethod
     def validate_products(cls, value):
         if not value:
             raise ValueError("Список товаров не может быть пустым")

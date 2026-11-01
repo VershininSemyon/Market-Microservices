@@ -6,11 +6,7 @@ services:
     ports:
       - "5000:80"
     depends_on:
-      - auth-backend
-      - products-backend
-      - reviews-backend
-      - analytics-backend
-      - orders-backend
+      - api-gateway
     networks:
       - app_net
 
@@ -29,6 +25,8 @@ services:
     depends_on:
       auth-postgres:
         condition: service_healthy
+      auth-redis:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     
@@ -46,6 +44,8 @@ services:
       - app_net
     depends_on:
       products-postgres:
+        condition: service_healthy
+      products-redis:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
@@ -66,6 +66,8 @@ services:
     depends_on:
       products-postgres:
         condition: service_healthy
+      products-redis:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
   
@@ -84,6 +86,8 @@ services:
     depends_on:
       reviews-postgres:
         condition: service_healthy
+      reviews-redis:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
   
@@ -100,6 +104,8 @@ services:
       - app_net
     depends_on:
       reviews-postgres:
+        condition: service_healthy
+      reviews-redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -187,7 +193,7 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-      mailhog:
+      mailpit:
         condition: service_started
 
   api-gateway:
@@ -204,6 +210,7 @@ services:
       - products-backend
       - reviews-backend
       - analytics-backend
+      - orders-backend
     networks:
       - app_net
 
@@ -404,10 +411,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-  
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
-    container_name: mailhog
+
+  mailpit:
+    image: axllent/mailpit:v1.22.1
+    container_name: mailpit
     restart: always
     ports:
       - "1025:1025"
@@ -466,6 +473,9 @@ services:
     depends_on:
       - auth-backend
       - products-backend
+      - reviews-backend
+      - analytics-backend
+      - orders-backend
 
   grafana:
     image: grafana/grafana:10.4.2
