@@ -62,6 +62,10 @@ class AuthService:
     async def delete_user(self, user_id: str) -> None:
         async with self.uow:
             user = await self.uow.user_repo.get_user_by_id(user_id)
+
+            if user is None:
+                raise UserNotFoundError()
+
             await self.uow.user_repo.delete_user(user_id)
             await self.uow.commit()
 
@@ -159,4 +163,8 @@ class AuthService:
 
         async with self.uow:
             user = await self.uow.user_repo.get_user_by_id(data['id'])
+
+            if user is None:
+                raise UserNotFoundError()
+
             return UserReadSchema.model_validate(user)

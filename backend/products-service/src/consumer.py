@@ -94,7 +94,7 @@ class RabbitMQConsumer:
                 )
 
             await asyncio.gather(*tasks)
-            await redis_cache.set_value(f"events:{event_id}", "done")
+            await redis_cache.set_value(f"events:{event_id}", "done", 3600 * 24 * 3)
             await message.ack()
 
         except json.JSONDecodeError:
