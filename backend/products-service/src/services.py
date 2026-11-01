@@ -73,7 +73,7 @@ class ProductService:
         product_ids = None
 
         if filters.text_query:
-            product_ids = await search_product(filters.text_query)
+            product_ids = await search_product(filters.text_query, filters.limit)
 
         async with self.uow:
             products = await self.uow.product_repo.list_products(
