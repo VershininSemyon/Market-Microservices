@@ -20,6 +20,8 @@ services:
       - .env
     expose:
       - "8001"
+    volumes:
+      - ./backend/auth-service/alembic/versions:/app/alembic/versions
     networks:
       - app_net
     depends_on:
@@ -40,6 +42,8 @@ services:
       - .env
     expose:
       - "8002"
+    volumes:
+      - ./backend/products-service/alembic/versions:/app/alembic/versions
     networks:
       - app_net
     depends_on:
@@ -61,6 +65,8 @@ services:
     env_file:
       - .env
     command: ["python", "run_consumer.py"]
+    volumes:
+      - ./backend/products-service/alembic/versions:/app/alembic/versions
     networks:
       - app_net
     depends_on:
@@ -81,6 +87,8 @@ services:
       - .env
     expose:
       - "8003"
+    volumes:
+      - ./backend/reviews-service/alembic/versions:/app/alembic/versions
     networks:
       - app_net
     depends_on:
@@ -100,6 +108,8 @@ services:
     env_file:
       - .env
     command: ["python", "run_consumer.py"]
+    volumes:
+      - ./backend/reviews-service/alembic/versions:/app/alembic/versions
     networks:
       - app_net
     depends_on:
@@ -120,6 +130,8 @@ services:
       - .env
     expose:
       - "8004"
+    volumes:
+      - ./backend/analytics-service/alembic/versions:/app/alembic/versions
     networks:
       - app_net
     depends_on:
@@ -137,6 +149,8 @@ services:
     env_file:
       - .env
     command: ["python", "run_consumer.py"]
+    volumes:
+      - ./backend/analytics-service/alembic/versions:/app/alembic/versions
     networks:
       - app_net
     depends_on:
@@ -155,6 +169,8 @@ services:
       - .env
     expose:
       - "8005"
+    volumes:
+      - ./backend/orders-service/alembic/versions:/app/alembic/versions
     networks:
       - app_net
     depends_on:
@@ -172,6 +188,8 @@ services:
     env_file:
       - .env
     command: ["python", "-m", "src.outbox_scheduler"]
+    volumes:
+      - ./backend/orders-service/alembic/versions:/app/alembic/versions
     networks:
       - app_net
     depends_on:
