@@ -13,6 +13,14 @@ class CorsSettings(BaseModel):
     CORS_ORIGINS: list[str] = ["http://localhost", "http://127.0.0.1"]
 
 
+class ProductsApiClientSettings(BaseModel):
+    PRODUCTS_SERVICE_URL: str = "http://products-backend:8002"
+    MAX_ATTEMPTS: int = 3
+    RETRY_PAUSE_SECONDS: float = 0.5
+    CONNECT_TIMEOUT: float = 2.0
+    REQUEST_TIMEOUT: float = 5.0
+
+
 class PostgresSettings(BaseModel):
     REVIEWS_SERVICE_POSTGRES_DB_NAME: str
     REVIEWS_SERVICE_POSTGRES_USER: str
@@ -65,6 +73,7 @@ class JwtSettings(BaseModel):
 class Settings(
     UvicornSettings,
     CorsSettings,
+    ProductsApiClientSettings,
     PostgresSettings,
     RedisSettings,
     JwtSettings,
