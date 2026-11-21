@@ -16,26 +16,25 @@ async def process_outbox():
     async with uow:
         events = await uow.outbox_repo.get_last_outbox_events(10)
 
-    if not events:
-        return
+        if not events:
+            return
 
-    processed_event_ids = []
+        processed_event_ids = []
 
-    for event in events:
-        try:
-            payload = OrderCreatedEventPayload.model_validate(event.event_payload)
-            await publish_order_created_event(payload)
+        for event in events:
+            try:
+                payload = OrderCreatedEventPayload.model_validate(event.event_payload)
+                await publish_order_created_event(payload)
 
-            processed_event_ids.append(event.id)
-            logger.info(f"Событие {event.id} успешно опубликовано")
-        except Exception as e:
-            logger.error(f"Ошибка при публикации события {event.id}: {e}")
+                processed_event_ids.append(event.id)
+                logger.info(f"Событие {event.id} успешно опубликовано")
+            except Exception as e:
+                logger.error(f"Ошибка при публикации события {event.id}: {e}")
 
-    if processed_event_ids:
-        async with uow:
+        if processed_event_ids:
             await uow.outbox_repo.delete_outbox_events(processed_event_ids)
             await uow.commit()
-        logger.info(f"Удалено {len(processed_event_ids)} обработанных событий из outbox")
+            logger.info(f"Удалено {len(processed_event_ids)} обработанных событий из outbox")
 
 
 async def main():
