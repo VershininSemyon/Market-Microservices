@@ -38,11 +38,12 @@ class RabbitMQConsumer:
 
     async def _update_product_data(
         self,
-        uow: UnitOfWork,
-        product_service: ProductService,
         product_id: str,
         quantity: int
     ) -> None:
+        uow = UnitOfWork(async_session_factory)
+        product_service = ProductService(uow)
+
         async with uow:
             await uow.product_repo.change_product_quantity(product_id, -quantity)
             await uow.commit()
@@ -72,26 +73,18 @@ class RabbitMQConsumer:
                 await message.nack(requeue=False)
                 return
 
-            logger.info(f"Получено событие создания заказа с продуктами: {products}")
-
-            uow = UnitOfWork(async_session_factory)
-            product_service = ProductService(uow)
-            tasks = []
-
             for product in products:
                 if "id" not in product or "quantity" not in product:
                     logger.warning(f"Некорректный формат продукта: {product}")
                     await message.nack(requeue=False)
                     return
 
-                tasks.append(
-                    self._update_product_data(
-                        uow,
-                        product_service,
-                        product["id"],
-                        product["quantity"]
-                    )
-                )
+            logger.info(f"Получено событие создания заказа с продуктами: {products}")
+
+            tasks = [
+                self._update_product_data(product["id"], product["quantity"])
+                for product in products
+            ]
 
             await asyncio.gather(*tasks)
             await redis_cache.set_value(f"events:{event_id}", "done", 3600 * 24 * 3)

@@ -53,8 +53,8 @@ dlq = RabbitQueue(
 )
 
 
-uow = UnitOfWork(async_session_factory)
-analytics_service = AnalyticsService(uow)
+def create_analytics_service() -> AnalyticsService:
+    return AnalyticsService(UnitOfWork(async_session_factory))
 
 
 def create_queue(name: str, routing_key: str) -> RabbitQueue:
@@ -90,7 +90,7 @@ async def process_user_created(
     logger: Logger,
 ) -> None:
     logger.info("Получено событие регистрации пользователя")
-    await analytics_service.add_analytics(
+    await create_analytics_service().add_analytics(
         entity_type=EntityTypeEnum.USER,
         event_type=EventTypeEnum.CREATED,
         day=msg.event_date
@@ -106,7 +106,7 @@ async def process_user_deleted(
     logger: Logger,
 ) -> None:
     logger.info("Получено событие удаления аккаунта")
-    await analytics_service.add_analytics(
+    await create_analytics_service().add_analytics(
         entity_type=EntityTypeEnum.USER,
         event_type=EventTypeEnum.DELETED,
         day=msg.event_date
@@ -122,7 +122,7 @@ async def process_product_created(
     logger: Logger,
 ) -> None:
     logger.info("Получено событие создания продукта")
-    await analytics_service.add_analytics(
+    await create_analytics_service().add_analytics(
         entity_type=EntityTypeEnum.PRODUCT,
         event_type=EventTypeEnum.CREATED,
         day=msg.event_date
@@ -138,7 +138,7 @@ async def process_product_deleted(
     logger: Logger,
 ) -> None:
     logger.info("Получено событие удаления продукта")
-    await analytics_service.add_analytics(
+    await create_analytics_service().add_analytics(
         entity_type=EntityTypeEnum.PRODUCT,
         event_type=EventTypeEnum.DELETED,
         day=msg.event_date
@@ -154,7 +154,7 @@ async def process_review_created(
     logger: Logger,
 ) -> None:
     logger.info("Получено событие создания отзыва для продукта")
-    await analytics_service.add_analytics(
+    await create_analytics_service().add_analytics(
         entity_type=EntityTypeEnum.REVIEW,
         event_type=EventTypeEnum.CREATED,
         day=msg.event_date
@@ -170,7 +170,7 @@ async def process_review_deleted(
     logger: Logger,
 ) -> None:
     logger.info("Получено событие удаления отзыва для продукта")
-    await analytics_service.add_analytics(
+    await create_analytics_service().add_analytics(
         entity_type=EntityTypeEnum.REVIEW,
         event_type=EventTypeEnum.DELETED,
         day=msg.event_date
@@ -186,7 +186,7 @@ async def process_order_created(
     logger: Logger,
 ) -> None:
     logger.info("Получено событие создания заказа")
-    await analytics_service.add_analytics(
+    await create_analytics_service().add_analytics(
         entity_type=EntityTypeEnum.ORDER,
         event_type=EventTypeEnum.CREATED,
         day=msg.event_date
