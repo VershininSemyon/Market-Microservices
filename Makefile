@@ -13,7 +13,7 @@
 	ruff-auth ruff-products ruff-reviews ruff-analytics ruff-orders ruff-notification ruff-all \
 	mypy-auth mypy-products mypy-reviews mypy-analytics mypy-orders mypy-notification mypy-all \
 	lint-auth lint-products lint-reviews lint-analytics lint-orders lint-notification lint-all \
-	test-auth test-products test-reviews test-all \
+	test-auth test-products test-reviews test-orders test-all \
 	up-auth up-products up-reviews up-analytics up-orders up-notification \
 	down-auth down-products down-reviews down-analytics down-orders down-notification \
 	restart-auth restart-products restart-reviews restart-analytics restart-orders restart-notification \
@@ -127,6 +127,7 @@ help:
 	@echo "  make test-auth          - тесты auth-service"
 	@echo "  make test-products      - тесты products-service"
 	@echo "  make test-reviews       - тесты reviews-service"
+	@echo "  make test-orders        - тесты orders-service"
 	@echo "  make test-all           - тесты всех сервисов"
 
 
@@ -445,10 +446,14 @@ test-products:
 test-reviews:
 	cd backend/reviews-service && uv run --group test pytest
 
+test-orders:
+	cd backend/orders-service && uv run --group test pytest
+
 test-all:
 	$(MAKE) test-auth
 	$(MAKE) test-products
 	$(MAKE) test-reviews
+	$(MAKE) test-orders
 
 
 # Individual services
