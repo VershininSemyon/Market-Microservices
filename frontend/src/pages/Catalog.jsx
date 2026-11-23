@@ -1,64 +1,133 @@
+
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-    ArrowDownUp, ArrowRight, ArrowUpRight, Search, SlidersHorizontal, ChevronDown,
-    ChevronLeft, ChevronRight, ShoppingBag, Truck, ShieldCheck, Leaf, Package, Zap, Star
+    ArrowDownUp,
+    ArrowRight,
+    ArrowUpRight,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Search,
+    ShoppingBag,
+    SlidersHorizontal
 } from 'lucide-react';
 import { errorMessage } from '../config/api';
 import { productsApi } from '../services/market';
-import { money } from '../shared';
+import { plural, useReveal } from '../shared';
 import ProductCard from '../components/ProductCard';
+
+const PAGE_SIZE = 12;
+
+const SORT_OPTIONS = [
+    { value: '', label: 'По умолчанию' },
+    { value: 'price-asc', label: 'Цена: по возрастанию' },
+    { value: 'price-desc', label: 'Цена: по убыванию' },
+    { value: 'name-asc', label: 'Название: А — Я' },
+    { value: 'name-desc', label: 'Название: Я — А' }
+];
+
+const PRINCIPLES = [
+    ['01', 'Отбираем вручную', 'Небольшая подборка вместо бесконечной витрины.'],
+    ['02', 'Показываем цену', 'Итоговая стоимость видна до оформления заказа.'],
+    ['03', 'Оставляем главное', 'Понятные описания без маркетингового шума.'],
+    ['04', 'Помогаем после', 'Заказ можно отследить в личном кабинете.']
+];
+
+const TRUST = [
+    ['01', 'Доставка без забот', 'Следите за статусом заказа в личном кабинете.'],
+    ['02', 'Безопасные покупки', 'Данные аккаунта и заказов защищены.'],
+    ['03', 'Осознанный выбор', 'Только товары, которые прошли отбор.'],
+    ['04', 'Только нужное', 'Меньше шума — больше смысла.']
+];
 
 export function Catalog({ add, liked, onLike }) {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [hasNext, setHasNext] = useState(false);
+    const [reloadKey, setReloadKey] = useState(0);
     const [searchParams, setSearchParams] = useSearchParams();
-
     const [query, setQuery] = useState(searchParams.get('text_query') || '');
     const [min, setMin] = useState(searchParams.get('min_price') || '');
     const [max, setMax] = useState(searchParams.get('max_price') || '');
-    const [sort, setSort] = useState(searchParams.get('order_by') || '');
+    const [sort, setSort] = useState(searchParams.get('sort') || '');
     const [offset, setOffset] = useState(0);
-    const [totalPage, setTotalPage] = useState(false);
+
+    const trustRef = useReveal();
+    const approachRef = useReveal();
+
+    const invalidRange = min !== '' && max !== '' && Number(min) > Number(max);
+    const orderBy = sort.startsWith('price') ? 'price' : sort.startsWith('name') ? 'name' : undefined;
+    const order = sort.endsWith('desc') ? 'desc' : 'asc';
+
+    // Фильтры живут в URL — ссылку на подборку можно скопировать.
+    useEffect(() => {
+        const params = {};
+        if (query) params.text_query = query;
+        if (min) params.min_price = min;
+        if (max) params.max_price = max;
+        if (sort) params.sort = sort;
+        setSearchParams(params, { replace: true });
+    }, [query, min, max, sort, setSearchParams]);
 
     useEffect(() => {
+        if (invalidRange) {
+            setLoading(false);
+            setError('');
+            return;
+        }
         let alive = true;
         setLoading(true);
-        const params = {
-            limit: 12,
-            offset,
-            text_query: query || undefined,
-            min_price: min || undefined,
-            max_price: max || undefined,
-            order_by: sort || undefined,
-            order: sort === 'price' ? 'asc' : 'desc'
-        };
-        productsApi
-            .list(params)
-            .then(data => {
-                if (alive) {
-                    setItems(data.filter(p => p.is_active !== false));
-                    setTotalPage(data.length === 12);
+
+        const timer = setTimeout(() => {
+            // При поиске бэкенд ограничивает выдачу Elasticsearch значением limit,
+            // а offset применяет уже к SQL. Чтобы страницы поиска не пустели,
+            // запрашиваем окно offset + PAGE_SIZE + 1 (не больше 100 — лимит API).
+            const requestLimit = query ? Math.min(offset + PAGE_SIZE + 1, 100) : PAGE_SIZE + 1;
+
+            productsApi
+                .list({
+                    limit: requestLimit,
+                    offset,
+                    text_query: query || undefined,
+                    min_price: min || undefined,
+                    max_price: max || undefined,
+                    order_by: orderBy,
+                    order
+                })
+                .then(data => {
+                    if (!alive) return;
+                    setItems(data.slice(0, PAGE_SIZE));
+                    setHasNext(data.length > PAGE_SIZE);
                     setError('');
-                }
-            })
-            .catch(e => {
-                if (alive) {
+                })
+                .catch(e => {
+                    if (!alive) return;
                     setError(errorMessage(e));
                     setItems([]);
-                }
-            })
-            .finally(() => alive && setLoading(false));
+                    setHasNext(false);
+                })
+                .finally(() => alive && setLoading(false));
+        }, 280);
+
         return () => {
             alive = false;
+            clearTimeout(timer);
         };
-    }, [query, min, max, sort, offset]);
+    }, [query, min, max, sort, offset, reloadKey, orderBy, order, invalidRange]);
 
     const submit = e => {
         e.preventDefault();
         setOffset(0);
-        setSearchParams(query ? { text_query: query } : {});
+    };
+
+    const reset = () => {
+        setQuery('');
+        setMin('');
+        setMax('');
+        setSort('');
+        setOffset(0);
     };
 
     return (
@@ -66,111 +135,93 @@ export function Catalog({ add, liked, onLike }) {
             <section className="hero">
                 <div className="hero-content">
                     <div className="eyebrow">
-                        <span className="eyebrow-dot" /> КУРАТОРСКИЙ МАРКЕТПЛЕЙС
+                        <span className="eyebrow-rule" /> Кураторский маркетплейс
                     </div>
                     <h1>
                         Хорошие вещи.
                         <br />
-                        <em>Хороший выбор.</em>
+                        <em>Без лишнего шума.</em>
                     </h1>
                     <p>
-                        Находите вещи, которые подходят вашему ритму жизни. Дизайн, качество и осознанный выбор — в
-                        одном месте.
+                        Небольшая подборка товаров для повседневной жизни: понятные описания, честные цены и
+                        аккуратный выбор без бесконечной прокрутки.
                     </p>
-                    <a href="#catalog" className="button button-lime">
-                        Исследовать каталог <ArrowRight size={18} />
-                    </a>
-                    <div className="hero-proof">
-                        <div className="proof-avatars">
-                            <span>А</span>
-                            <span>М</span>
-                            <span>Е</span>
-                            <span>+</span>
-                        </div>
-                        <div>
-                            <strong>Покупки с удовольствием</strong>
-                            <small>Выбирайте то, что важно именно вам</small>
-                        </div>
+                    <div className="hero-actions">
+                        <a href="#catalog" className="button button-dark">
+                            Смотреть каталог <ArrowRight size={17} />
+                        </a>
+                        <a href="#approach" className="text-link">
+                            Как мы выбираем <ArrowUpRight size={15} />
+                        </a>
+                    </div>
+                    <div className="hero-meta">
+                        <span>Сезон 2026</span>
+                        <span>Ручной отбор</span>
+                        <span>Честные цены</span>
                     </div>
                 </div>
-                <div className="hero-art">
-                    <div className="hero-orbit orbit-one"></div>
-                    <div className="hero-orbit orbit-two"></div>
-                    <div className="hero-blob">
-                        <img
-                            src="https://images.unsplash.com/photo-1490312278390-ab64016e0aa9?auto=format&fit=crop&w=1100&q=90"
-                            alt="Подборка стильных вещей"
-                        />
+
+                <aside className="hero-ledger" aria-label="Принципы маркетплейса">
+                    <div className="ledger-head">
+                        <span>Market / Index</span>
+                        <span>01—04</span>
                     </div>
-                    <div className="floating-card floating-top">
-                        <span className="floating-icon"><Zap size={18} /></span>
-                        <div>
-                            <b>Выбор дня</b>
-                            <small>Вещи с характером</small>
-                        </div>
+                    <ol>
+                        {PRINCIPLES.map(([n, title, text]) => (
+                            <li key={n}>
+                                <span>{n}</span>
+                                <div>
+                                    <b>{title}</b>
+                                    <small>{text}</small>
+                                </div>
+                            </li>
+                        ))}
+                    </ol>
+                    <div className="ledger-foot">
+                        <span>Меньше, но лучше</span>
+                        <ArrowUpRight size={16} />
                     </div>
-                    <div className="floating-card floating-bottom">
-                        <span className="rating-star"><Star size={16} fill="currentColor" /></span>
-                        <div>
-                            <b>Любимые находки</b>
-                            <small>Откройте что-то новое</small>
-                        </div>
-                    </div>
-                    <div className="hero-spark">✳</div>
-                </div>
+                </aside>
+
                 <div className="hero-bottom-label">
                     LESS, BUT BETTER <span>—</span> 01 / 04
                 </div>
             </section>
 
-            <section className="trust-strip">
-                <div>
-                    <Truck />
-                    <span>
-                        <b>Доставка без забот</b>
-                        <small>Отслеживайте свои заказы</small>
-                    </span>
-                </div>
-                <div>
-                    <ShieldCheck />
-                    <span>
-                        <b>Безопасные покупки</b>
-                        <small>Ваши данные под защитой</small>
-                    </span>
-                </div>
-                <div>
-                    <Leaf />
-                    <span>
-                        <b>Осознанный выбор</b>
-                        <small>Покупайте то, что любите</small>
-                    </span>
-                </div>
-                <div>
-                    <Package />
-                    <span>
-                        <b>Только нужное</b>
-                        <small>Меньше шума, больше смысла</small>
-                    </span>
-                </div>
+            <section className="trust-strip reveal" aria-label="Преимущества" ref={trustRef}>
+                {TRUST.map(([n, title, text]) => (
+                    <div key={n}>
+                        <span className="trust-index">{n}</span>
+                        <span>
+                            <b>{title}</b>
+                            <small>{text}</small>
+                        </span>
+                    </div>
+                ))}
             </section>
 
             <section className="catalog-section section-shell" id="catalog">
                 <div className="section-heading">
                     <div>
-                        <div className="eyebrow">НАШ КАТАЛОГ</div>
+                        <div className="eyebrow">Каталог</div>
                         <h2>
-                            Вещи, которые <em>вдохновляют.</em>
+                            Вещи, которые <em>пригождаются.</em>
                         </h2>
                         <p>Подборка на каждый день — от полезных мелочей до особенных находок.</p>
                     </div>
                     <span className="catalog-counter">
-                        {items.length ? `${items.length} товаров` : ''} <ArrowDownUp size={15} />
+                        {loading
+                            ? 'Обновляем…'
+                            : items.length
+                              ? `${items.length} ${plural(items.length, 'товар', 'товара', 'товаров')}`
+                              : 'Пусто'}
+                        <ArrowDownUp size={14} />
                     </span>
                 </div>
 
                 <form className="catalog-tools" onSubmit={submit}>
                     <label className="search-box">
-                        <Search size={19} />
+                        <Search size={18} />
                         <input
                             value={query}
                             onChange={e => {
@@ -178,6 +229,7 @@ export function Catalog({ add, liked, onLike }) {
                                 setOffset(0);
                             }}
                             placeholder="Что ищем сегодня?"
+                            aria-label="Поиск по каталогу"
                         />
                         <button type="submit" className="search-submit">
                             Найти
@@ -195,6 +247,7 @@ export function Catalog({ add, liked, onLike }) {
                                     setOffset(0);
                                 }}
                                 placeholder="0"
+                                aria-label="Минимальная цена"
                             />
                         </label>
                         <label className="price-field">
@@ -208,25 +261,39 @@ export function Catalog({ add, liked, onLike }) {
                                     setOffset(0);
                                 }}
                                 placeholder="∞"
+                                aria-label="Максимальная цена"
                             />
                         </label>
                         <label className="sort-select">
-                            <SlidersHorizontal size={16} />
-                            <select value={sort} onChange={e => setSort(e.target.value)}>
-                                <option value="">По умолчанию</option>
-                                <option value="price">По цене</option>
-                                <option value="name">По названию</option>
+                            <SlidersHorizontal size={15} />
+                            <select
+                                value={sort}
+                                onChange={e => {
+                                    setSort(e.target.value);
+                                    setOffset(0);
+                                }}
+                                aria-label="Сортировка"
+                            >
+                                {SORT_OPTIONS.map(option => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
                             </select>
-                            <ChevronDown size={15} />
+                            <ChevronDown size={14} />
                         </label>
                     </div>
                 </form>
+
+                {invalidRange && (
+                    <p className="range-hint">Минимальная цена не может быть больше максимальной — уточните диапазон.</p>
+                )}
 
                 {error && (
                     <div className="error-panel">
                         <p>Не удалось загрузить каталог. Проверьте, что API доступен.</p>
                         <small>{error}</small>
-                        <button className="button button-outline" onClick={() => setOffset(v => v)}>
+                        <button className="button button-outline" onClick={() => setReloadKey(v => v + 1)}>
                             Повторить
                         </button>
                     </div>
@@ -234,29 +301,23 @@ export function Catalog({ add, liked, onLike }) {
 
                 {loading ? (
                     <div className="product-grid">
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                        {[1, 2, 3, 4, 5, 6].map(i => (
                             <div className="skeleton-card" key={i}>
-                                <div />
-                                <span />
-                                <span />
+                                <span className="sk-top" />
+                                <span className="sk-mark" />
+                                <span className="sk-line" />
+                                <span className="sk-line short" />
                             </div>
                         ))}
                     </div>
-                ) : !items.length && !error ? (
+                ) : !items.length && !error && !invalidRange ? (
                     <div className="empty-state">
-                        <div className="empty-icon"><ShoppingBag /></div>
+                        <div className="empty-icon">
+                            <ShoppingBag />
+                        </div>
                         <h3>Пока ничего не найдено</h3>
                         <p>Попробуйте изменить запрос или сбросить фильтры.</p>
-                        <button
-                            className="button button-dark"
-                            onClick={() => {
-                                setQuery('');
-                                setMin('');
-                                setMax('');
-                                setSort('');
-                                setOffset(0);
-                            }}
-                        >
+                        <button className="button button-dark" onClick={reset}>
                             Сбросить фильтры
                         </button>
                     </div>
@@ -277,54 +338,63 @@ export function Catalog({ add, liked, onLike }) {
                         <div className="pagination">
                             <button
                                 className="button button-outline"
-                                disabled={offset === 0}
-                                onClick={() => setOffset(Math.max(0, offset - 12))}
+                                disabled={loading || offset === 0}
+                                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                             >
-                                <ChevronLeft size={17} /> Назад
+                                <ChevronLeft size={16} /> Назад
                             </button>
-                            <span>Страница {Math.floor(offset / 12) + 1}</span>
+                            <span>Страница {Math.floor(offset / PAGE_SIZE) + 1}</span>
                             <button
                                 className="button button-outline"
-                                disabled={!totalPage}
-                                onClick={() => setOffset(offset + 12)}
+                                disabled={loading || !hasNext}
+                                onClick={() => setOffset(offset + PAGE_SIZE)}
                             >
-                                Дальше <ChevronRight size={17} />
+                                Дальше <ChevronRight size={16} />
                             </button>
                         </div>
                     </>
                 )}
             </section>
 
-            <section className="feature-banner section-shell">
+            <section className="feature-banner section-shell reveal" id="approach" ref={approachRef}>
                 <div className="feature-copy">
-                    <div className="eyebrow">МЕНЬШЕ, НО ЛУЧШЕ</div>
+                    <div className="eyebrow">Наш подход</div>
                     <h2>
-                        Покупайте с умом.
+                        Меньше выбора.
                         <br />
-                        <em>Живите с удовольствием.</em>
+                        <em>Больше смысла.</em>
                     </h2>
                     <p>
-                        Мы верим, что хорошие вещи не нуждаются в лишнем шуме. Только полезные товары, понятные цены и
-                        приятный опыт.
+                        Мы не стремимся показать всё сразу. Вместо этого — небольшой каталог, в котором каждая
+                        позиция объяснима: зачем она нужна, сколько стоит и когда приедет.
                     </p>
-                    <a href="#catalog" className="button button-dark">
-                        Найти свою вещь <ArrowUpRight size={18} />
+                    <a href="#catalog" className="button button-outline">
+                        Вернуться к каталогу <ArrowUpRight size={16} />
                     </a>
                 </div>
-                <div className="feature-visual">
-                    <img
-                        src="https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=1000&q=85"
-                        alt="Минималистичный интерьер"
-                    />
-                    <div className="feature-note">
-                        <Leaf size={17} />
-                        <span>
-                            Выбор с заботой
-                            <br />
-                            <b>о вашем времени</b>
-                        </span>
-                    </div>
-                </div>
+                <ol className="feature-index">
+                    <li>
+                        <span>01</span>
+                        <div>
+                            <b>Понятные цены</b>
+                            <small>Стоимость и наличие видны до оформления заказа.</small>
+                        </div>
+                    </li>
+                    <li>
+                        <span>02</span>
+                        <div>
+                            <b>Спокойный выбор</b>
+                            <small>Описания без давления и обещаний, которые нельзя проверить.</small>
+                        </div>
+                    </li>
+                    <li>
+                        <span>03</span>
+                        <div>
+                            <b>Прозрачный заказ</b>
+                            <small>История покупок и состав заказа всегда под рукой.</small>
+                        </div>
+                    </li>
+                </ol>
             </section>
         </main>
     );

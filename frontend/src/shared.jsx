@@ -1,37 +1,64 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import {
-    ArrowDownUp, ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight,
-    Heart, Leaf, LockKeyhole, LogIn, LogOut, Menu, Minus, Package, Plus, Search, ShieldCheck,
-    ShoppingBag, SlidersHorizontal, Star, Trash2, Truck, UserRound, X, Zap, LayoutDashboard,
-    ChartNoAxesColumnIncreasing, Box, RefreshCw
-} from 'lucide-react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { api, errorMessage } from './config/api';
-import { productsApi, ordersApi, reviewsApi, userApi, analyticsApi } from './services/market';
 
-export const money = (n) => new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    maximumFractionDigits: 0
-}).format(Number(n) || 0);
+import { useEffect, useRef } from 'react';
 
-export const demoImages = [
-    'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=85',
-    'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=85',
-    'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=85',
-    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=900&q=85',
-    'https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=900&q=85',
-    'https://images.unsplash.com/photo-1526170315874-1d8b5a7d6e6e?auto=format&fit=crop&w=900&q=85'
-];
+export const money = n =>
+    new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        maximumFractionDigits: 0
+    }).format(Number(n) || 0);
 
-export const imageFor = (p, i = 0) => p?.image_url || p?.image || demoImages[i % demoImages.length];
+export const productInitial = product => (product?.name?.trim()?.charAt(0) || 'M').toUpperCase();
 
-export {
-    useEffect, useMemo, useState, Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams,
-    ArrowDownUp, ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight,
-    Heart, Leaf, LockKeyhole, LogIn, LogOut, Menu, Minus, Package, Plus, Search, ShieldCheck,
-    ShoppingBag, SlidersHorizontal, Star, Trash2, Truck, UserRound, X, Zap, LayoutDashboard,
-    ChartNoAxesColumnIncreasing, Box, RefreshCw, AuthProvider, useAuth, api, errorMessage,
-    productsApi, ordersApi, reviewsApi, userApi, analyticsApi
+export const shortId = id => String(id || '').slice(0, 8).toUpperCase();
+
+export const formatDate = value => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('ru-RU');
 };
+
+export const plural = (count, one, few, many) => {
+    const n = Math.abs(Number(count) || 0) % 100;
+    const n1 = n % 10;
+    if (n > 10 && n < 20) return many;
+    if (n1 > 1 && n1 < 5) return few;
+    if (n1 === 1) return one;
+    return many;
+};
+
+// Детерминированный цвет монограммы: один товар — один цвет везде.
+export const toneClass = product => {
+    const key = String(product?.id || product?.name || '');
+    let sum = 0;
+    for (let i = 0; i < key.length; i += 1) sum += key.charCodeAt(i);
+    return `tone-${sum % 4}`;
+};
+
+export function useReveal() {
+    const ref = useRef(null);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        if (!('IntersectionObserver' in window)) {
+            el.classList.add('is-visible');
+            return;
+        }
+        const observer = new IntersectionObserver(
+            entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            },
+            { threshold: 0.12 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    return ref;
+}

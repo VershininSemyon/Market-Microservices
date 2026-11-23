@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, LockKeyhole, Leaf, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { errorMessage } from '../config/api';
 
@@ -36,11 +37,11 @@ export function AuthPage({ registerMode = false }) {
         <main className="auth-page">
             <div className="auth-aside">
                 <Link to="/" className="logo logo-light">
-                    <span className="logo-mark"><Leaf /></span>
+                    <span className="logo-mark" aria-hidden="true">m</span>
                     <span>market<span className="logo-dot">.</span></span>
                 </Link>
                 <div>
-                    <div className="eyebrow">ХОРОШИЙ ВЫБОР НАЧИНАЕТСЯ ЗДЕСЬ</div>
+                    <div className="eyebrow">Хороший выбор начинается здесь</div>
                     <h1>
                         Меньше лишнего.
                         <br />
@@ -50,6 +51,7 @@ export function AuthPage({ registerMode = false }) {
                 </div>
                 <small>© 2026 Market</small>
             </div>
+
             <div className="auth-form-side">
                 <div className="auth-form-wrap">
                     <Link to="/" className="back-link">
@@ -64,19 +66,20 @@ export function AuthPage({ registerMode = false }) {
                                 : 'Рады видеть вас снова. Введите свои данные.'}
                         </p>
                     </div>
+
                     <form onSubmit={submit} className="form-stack">
-                        {registerMode && (
-                            <label className="form-field">
-                                <span>Как к вам обращаться</span>
-                                <input
-                                    required
-                                    name="username"
-                                    value={form.username}
-                                    onChange={change}
-                                    placeholder="Ваше имя"
-                                />
-                            </label>
-                        )}
+                        <label className="form-field">
+                            <span>{registerMode ? 'Как к вам обращаться' : 'Имя пользователя'}</span>
+                            <input
+                                required
+                                maxLength={100}
+                                name="username"
+                                value={form.username}
+                                onChange={change}
+                                placeholder={registerMode ? 'Ваше имя' : 'Ваш логин'}
+                                autoComplete="username"
+                            />
+                        </label>
                         {registerMode && (
                             <label className="form-field">
                                 <span>Электронная почта</span>
@@ -87,19 +90,7 @@ export function AuthPage({ registerMode = false }) {
                                     value={form.email}
                                     onChange={change}
                                     placeholder="you@example.com"
-                                />
-                            </label>
-                        )}
-                        {!registerMode && (
-                            <label className="form-field">
-                                <span>Имя пользователя</span>
-                                <input
-                                    required
-                                    name="username"
-                                    value={form.username}
-                                    onChange={change}
-                                    placeholder="Ваш логин"
-                                    autoComplete="username"
+                                    autoComplete="email"
                                 />
                             </label>
                         )}
@@ -122,6 +113,7 @@ export function AuthPage({ registerMode = false }) {
                             <ArrowRight size={18} />
                         </button>
                     </form>
+
                     <p className="auth-switch">
                         {registerMode ? 'Уже есть аккаунт?' : 'Впервые у нас?'}{' '}
                         <Link to={registerMode ? '/login' : '/register'}>

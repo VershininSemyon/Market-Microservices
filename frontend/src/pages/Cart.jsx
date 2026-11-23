@@ -1,19 +1,44 @@
+
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Minus, Plus, ShoppingBag, Trash2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { errorMessage } from '../config/api';
 import { ordersApi } from '../services/market';
-import { money, imageFor } from '../shared';
+import { money, productInitial, plural, toneClass } from '../shared';
 
-export function Cart({ cart, setCart, add, toast }) {
+export function Cart({ cart, setCart, toast }) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const entries = Object.entries(cart);
     const [busy, setBusy] = useState(false);
-    const total = entries.reduce((sum, [id, item]) => sum + item.product.price * item.quantity, 0);
 
-    const update = (id, q) => setCart(prev => ({ ...prev, [id]: { ...prev[id], quantity: q } }));
+    const total = entries.reduce((sum, [, item]) => sum + item.product.price * item.quantity, 0);
+    const positions = entries.length;
+    const units = entries.reduce((sum, [, item]) => sum + item.quantity, 0);
+
+    const update = (id, q) =>
+        setCart(prev => {
+            const item = prev[id];
+            if (!item) return prev;
+            const quantity = Math.max(1, Math.min(q, item.product.quantity));
+            return { ...prev, [id]: { ...item, quantity } };
+        });
+
+    const remove = id => {
+        const entry = cart[id];
+        setCart(prev => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+        });
+        if (entry) {
+            toast('Товар убран из корзины', 'info', {
+                label: 'Вернуть',
+                onClick: () => setCart(prev => ({ ...prev, [id]: entry }))
+            });
+        }
+    };
 
     const checkout = async () => {
         if (!user) {
@@ -28,7 +53,7 @@ export function Cart({ cart, setCart, add, toast }) {
             toast('Заказ успешно оформлен!');
             navigate('/orders');
         } catch (e) {
-            toast(errorMessage(e));
+            toast(errorMessage(e), 'error');
         } finally {
             setBusy(false);
         }
@@ -38,16 +63,21 @@ export function Cart({ cart, setCart, add, toast }) {
         <main className="page-shell">
             <div className="page-title-row">
                 <div>
-                    <div className="eyebrow">ВАШ ВЫБОР</div>
+                    <div className="eyebrow">Ваш выбор</div>
                     <h1>
                         Корзина <em>покупок.</em>
                     </h1>
                 </div>
-                <span className="subtle">{entries.length} позиций</span>
+                <span className="subtle">
+                    {positions} {plural(positions, 'позиция', 'позиции', 'позиций')}
+                </span>
             </div>
+
             {!entries.length ? (
                 <div className="empty-state cart-empty">
-                    <div className="empty-icon"><ShoppingBag /></div>
+                    <div className="empty-icon">
+                        <ShoppingBag />
+                    </div>
                     <h2>Корзина пока пуста</h2>
                     <p>Самое время найти что-нибудь хорошее.</p>
                     <Link to="/" className="button button-dark">
@@ -59,26 +89,28 @@ export function Cart({ cart, setCart, add, toast }) {
                     <div className="cart-items">
                         {entries.map(([id, { product, quantity }], i) => (
                             <article className="cart-item" key={id}>
-                                <img src={imageFor(product, i)} alt={product.name} />
+                                <div className={`cart-item-mark ${toneClass(product)}`} aria-hidden="true">
+                                    <span>{productInitial(product)}</span>
+                                    <small>{String(i + 1).padStart(2, '0')}</small>
+                                </div>
                                 <div className="cart-item-info">
                                     <Link to={`/product/${id}`}>{product.name}</Link>
                                     <small>{money(product.price)} за шт.</small>
+                                    {quantity > product.quantity && (
+                                        <span className="stock-warn">
+                                            В наличии только {product.quantity} шт. — уменьшите количество.
+                                        </span>
+                                    )}
                                     <div className="quantity-control">
                                         <button
-                                            onClick={() =>
-                                                quantity <= 1
-                                                    ? setCart(prev => {
-                                                          const n = { ...prev };
-                                                          delete n[id];
-                                                          return n;
-                                                      })
-                                                    : update(id, quantity - 1)
-                                            }
+                                            aria-label="Уменьшить количество"
+                                            onClick={() => (quantity <= 1 ? remove(id) : update(id, quantity - 1))}
                                         >
                                             <Minus size={14} />
                                         </button>
                                         <span>{quantity}</span>
                                         <button
+                                            aria-label="Увеличить количество"
                                             disabled={quantity >= product.quantity}
                                             onClick={() => update(id, quantity + 1)}
                                         >
@@ -90,16 +122,11 @@ export function Cart({ cart, setCart, add, toast }) {
                                     <b>{money(product.price * quantity)}</b>
                                     <button
                                         className="remove-button"
-                                        onClick={() =>
-                                            setCart(prev => {
-                                                const n = { ...prev };
-                                                delete n[id];
-                                                return n;
-                                            })
-                                        }
-                                        aria-label="Удалить"
+                                        onClick={() => remove(id)}
+                                        aria-label={`Удалить «${product.name}» из корзины`}
+                                        title="Удалить"
                                     >
-                                        <Trash2 size={17} />
+                                        <Trash2 size={16} />
                                     </button>
                                 </div>
                             </article>
@@ -108,10 +135,11 @@ export function Cart({ cart, setCart, add, toast }) {
                             <ArrowLeft size={16} /> Продолжить покупки
                         </Link>
                     </div>
+
                     <aside className="order-summary">
                         <h3>Ваш заказ</h3>
                         <div className="summary-line">
-                            <span>Товары</span>
+                            <span>Товары · {units} шт.</span>
                             <span>{money(total)}</span>
                         </div>
                         <div className="summary-line">
@@ -122,15 +150,11 @@ export function Cart({ cart, setCart, add, toast }) {
                             <span>Итого</span>
                             <strong>{money(total)}</strong>
                         </div>
-                        <button
-                            className="button button-dark button-wide"
-                            disabled={busy}
-                            onClick={checkout}
-                        >
+                        <button className="button button-dark button-wide" disabled={busy} onClick={checkout}>
                             {busy ? 'Оформляем…' : 'Оформить заказ'} <ArrowRight size={18} />
                         </button>
                         <div className="secure-note">
-                            <ShieldCheck size={16} /> Безопасное оформление заказа
+                            <ShieldCheck size={15} /> Безопасное оформление заказа
                         </div>
                     </aside>
                 </div>

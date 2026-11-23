@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Star, Truck, ShieldCheck, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Star, Truck, ShieldCheck, ShoppingBag, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { errorMessage } from '../config/api';
 import { productsApi, reviewsApi } from '../services/market';
-import { money, imageFor } from '../shared';
+import { money, formatDate, productInitial, shortId, plural, toneClass } from '../shared';
 
 export function ProductDetail({ add }) {
     const { id } = useParams();
@@ -15,10 +16,23 @@ export function ProductDetail({ add }) {
     const [error, setError] = useState('');
     const [rating, setRating] = useState(9);
     const [comment, setComment] = useState('');
+    const [pending, setPending] = useState(false);
     const [notice, setNotice] = useState('');
+    const [noticeKind, setNoticeKind] = useState('success');
+    const [editingId, setEditingId] = useState(null);
+    const [editForm, setEditForm] = useState({ rating: 10, comment: '' });
 
     useEffect(() => {
         let ok = true;
+        setBusy(true);
+        setError('');
+        setNotice('');
+        setEditingId(null);
+        setComment('');
+        setRating(9);
+        setProduct(null);
+        setReviews({ reviews: [], avg_rating: 0 });
+
         Promise.all([
             productsApi.get(id),
             reviewsApi.list(id).catch(() => ({ reviews: [], avg_rating: 0 }))
@@ -29,22 +43,73 @@ export function ProductDetail({ add }) {
                     setReviews(r);
                 }
             })
-            .catch(e => setError(errorMessage(e)))
-            .finally(() => setBusy(false));
+            .catch(e => ok && setError(errorMessage(e)))
+            .finally(() => ok && setBusy(false));
+
         return () => {
             ok = false;
         };
     }, [id]);
 
+    const showNotice = (text, kind = 'success') => {
+        setNotice(text);
+        setNoticeKind(kind);
+    };
+
+    const refreshReviews = async () => {
+        try {
+            setReviews(await reviewsApi.list(id));
+        } catch (e) {
+            showNotice(errorMessage(e), 'error');
+        }
+    };
+
     const submit = async e => {
         e.preventDefault();
+        setPending(true);
         try {
             await reviewsApi.create({ product_id: id, rating, comment });
             setComment('');
-            setNotice('Спасибо за отзыв!');
-            setReviews(await reviewsApi.list(id));
+            setRating(9);
+            showNotice('Спасибо за отзыв!');
+            await refreshReviews();
         } catch (e) {
-            setNotice(errorMessage(e));
+            showNotice(errorMessage(e), 'error');
+        } finally {
+            setPending(false);
+        }
+    };
+
+    const startEdit = review => {
+        setEditingId(review.id);
+        setEditForm({ rating: review.rating, comment: review.comment });
+        setNotice('');
+    };
+
+    const saveEdit = async e => {
+        e.preventDefault();
+        setPending(true);
+        try {
+            await reviewsApi.update(editingId, editForm);
+            setEditingId(null);
+            showNotice('Отзыв обновлён');
+            await refreshReviews();
+        } catch (e) {
+            showNotice(errorMessage(e), 'error');
+        } finally {
+            setPending(false);
+        }
+    };
+
+    const removeReview = async reviewId => {
+        if (!window.confirm('Удалить отзыв?')) return;
+        try {
+            await reviewsApi.remove(reviewId);
+            if (editingId === reviewId) setEditingId(null);
+            showNotice('Отзыв удалён');
+            await refreshReviews();
+        } catch (e) {
+            showNotice(errorMessage(e), 'error');
         }
     };
 
@@ -61,7 +126,7 @@ export function ProductDetail({ add }) {
             <main className="page-shell">
                 <div className="empty-state">
                     <h2>Товар не найден</h2>
-                    <p>{error}</p>
+                    <p>{error || 'Возможно, товар был удалён из каталога.'}</p>
                     <Link to="/" className="button button-dark">
                         В каталог
                     </Link>
@@ -70,23 +135,53 @@ export function ProductDetail({ add }) {
         );
     }
 
+    const inStock = product.quantity > 0;
+    const reviewList = reviews.reviews || [];
+    const myReview = user ? reviewList.find(r => r.user_id === user.id) : null;
+    const commentLength = comment.length;
+
     return (
         <main className="page-shell">
             <Link to="/" className="back-link">
                 <ArrowLeft size={16} /> Вернуться в каталог
             </Link>
+
             <div className="detail-layout">
-                <div className="detail-image">
-                    <img src={imageFor(product, 2)} alt={product.name} />
-                    <span className="image-chip">{product.quantity > 0 ? 'В наличии' : 'Нет в наличии'}</span>
-                </div>
+                <aside className={`detail-specimen ${toneClass(product)}`} aria-label="Карточка товара">
+                    <div className="specimen-top">
+                        <span>Product / Specimen</span>
+                        <span>№ {shortId(product.id)}</span>
+                    </div>
+                    <div className="specimen-mark" aria-hidden="true">
+                        <span>{productInitial(product)}</span>
+                    </div>
+                    <dl className="specimen-meta">
+                        <div>
+                            <dt>Цена</dt>
+                            <dd>{money(product.price)}</dd>
+                        </div>
+                        <div>
+                            <dt>Наличие</dt>
+                            <dd className={inStock ? '' : 'is-muted'}>
+                                {inStock ? `${product.quantity} шт.` : 'Нет в наличии'}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>В каталоге с</dt>
+                            <dd>{formatDate(product.created_at)}</dd>
+                        </div>
+                    </dl>
+                </aside>
+
                 <div className="detail-info">
-                    <div className="eyebrow">ВЫБОР MARKET</div>
+                    <div className="eyebrow">Товар / {shortId(product.id)}</div>
                     <h1>{product.name}</h1>
                     <div className="detail-rating">
-                        <Star size={17} fill="currentColor" />{' '}
-                        {reviews.avg_rating ? Number(reviews.avg_rating).toFixed(1) : 'Новый товар'}{' '}
-                        <span>· {reviews.reviews?.length || 0} отзывов</span>
+                        <Star size={16} fill="currentColor" />
+                        {reviews.avg_rating ? Number(reviews.avg_rating).toFixed(1) : 'Новый товар'}
+                        <span>
+                            · {reviewList.length} {plural(reviewList.length, 'отзыв', 'отзыва', 'отзывов')}
+                        </span>
                     </div>
                     <div className="detail-price">{money(product.price)}</div>
                     <p className="detail-description">
@@ -95,22 +190,22 @@ export function ProductDetail({ add }) {
                     </p>
                     <div className="detail-meta">
                         <span>
-                            <Truck /> Удобная доставка
+                            <Truck /> Статус заказа — в кабинете
                         </span>
                         <span>
-                            <ShieldCheck /> Защищённая оплата
+                            <ShieldCheck /> Данные под защитой
                         </span>
                     </div>
                     <div className="detail-actions">
                         <button
                             className="button button-dark"
-                            disabled={product.quantity < 1}
+                            disabled={!inStock}
                             onClick={() => add(product)}
                         >
                             <ShoppingBag size={18} /> Добавить в корзину
                         </button>
                         <span className="stock-note">
-                            {product.quantity > 0 ? `В наличии: ${product.quantity}` : 'Нет в наличии'}
+                            {inStock ? `В наличии: ${product.quantity}` : 'Нет в наличии'}
                         </span>
                     </div>
                     <div className="detail-divider" />
@@ -127,17 +222,30 @@ export function ProductDetail({ add }) {
             <section className="reviews-section">
                 <div className="section-heading">
                     <div>
-                        <div className="eyebrow">ОПЫТ ПОКУПАТЕЛЕЙ</div>
+                        <div className="eyebrow">Опыт покупателей</div>
                         <h2>
                             Отзывы <em>о товаре</em>
                         </h2>
                     </div>
                     <div className="review-average">
-                        <Star fill="currentColor" /> {Number(reviews.avg_rating || 0).toFixed(1)} / 10
+                        <Star size={15} fill="currentColor" /> {Number(reviews.avg_rating || 0).toFixed(1)} / 10
                     </div>
                 </div>
 
-                {user && (
+                {notice && (
+                    <p className={noticeKind === 'error' ? 'notice-text is-error' : 'notice-text'}>{notice}</p>
+                )}
+
+                {user && myReview && editingId !== myReview.id && (
+                    <div className="review-own">
+                        <p>Вы уже оставили отзыв на этот товар.</p>
+                        <button className="button button-outline button-small" onClick={() => startEdit(myReview)}>
+                            <Pencil size={13} /> Изменить отзыв
+                        </button>
+                    </div>
+                )}
+
+                {user && !myReview && (
                     <form className="review-form" onSubmit={submit}>
                         <h3>Поделитесь впечатлением</h3>
                         <label className="form-field">
@@ -151,7 +259,7 @@ export function ProductDetail({ add }) {
                             />
                         </label>
                         <label className="form-field">
-                            <span>Ваш отзыв (от 20 символов)</span>
+                            <span>Ваш отзыв</span>
                             <textarea
                                 required
                                 minLength={20}
@@ -161,42 +269,103 @@ export function ProductDetail({ add }) {
                                 onChange={e => setComment(e.target.value)}
                                 placeholder="Что понравилось в товаре?"
                             />
+                            <small className={commentLength < 20 ? 'char-hint is-warn' : 'char-hint'}>
+                                {commentLength < 20
+                                    ? `Ещё ${20 - commentLength} символов до минимума (20)`
+                                    : `${commentLength} / 1000`}
+                            </small>
                         </label>
-                        {notice && <p className="notice-text">{notice}</p>}
-                        <button className="button button-dark">Опубликовать отзыв</button>
+                        <button className="button button-dark" disabled={pending}>
+                            {pending ? 'Публикуем…' : 'Опубликовать отзыв'}
+                        </button>
                     </form>
                 )}
 
-                {reviews.reviews?.length ? (
+                {reviewList.length ? (
                     <div className="reviews-list">
-                        {reviews.reviews.map(r => (
-                            <article className="review-card" key={r.id}>
-                                <div className="review-card-head">
-                                    <span className="review-avatar">
-                                        {String(r.user_id).slice(0, 1).toUpperCase()}
-                                    </span>
-                                    <div>
-                                        <b>Покупатель</b>
-                                        <small>{new Date(r.created_at).toLocaleDateString('ru-RU')}</small>
+                        {reviewList.map(r => {
+                            const isOwn = user?.id === r.user_id;
+                            return (
+                                <article className="review-card" key={r.id}>
+                                    <div className="review-card-head">
+                                        <span className={`review-avatar ${toneClass({ id: r.user_id })}`} aria-hidden="true">
+                                            {String(r.user_id).slice(0, 1).toUpperCase()}
+                                        </span>
+                                        <div>
+                                            <b>{isOwn ? 'Ваш отзыв' : 'Покупатель'}</b>
+                                            <small>{formatDate(r.created_at)}</small>
+                                        </div>
+                                        <span className="review-score">
+                                            <Star size={13} fill="currentColor" /> {r.rating}/10
+                                        </span>
                                     </div>
-                                    <span className="review-score">
-                                        <Star size={14} fill="currentColor" /> {r.rating}/10
-                                    </span>
-                                </div>
-                                <p>{r.comment}</p>
-                                {user?.id === r.user_id && (
-                                    <button
-                                        className="text-danger"
-                                        onClick={async () => {
-                                            await reviewsApi.remove(r.id);
-                                            setReviews(await reviewsApi.list(id));
-                                        }}
-                                    >
-                                        Удалить отзыв
-                                    </button>
-                                )}
-                            </article>
-                        ))}
+
+                                    {editingId === r.id ? (
+                                        <form className="review-inline-form" onSubmit={saveEdit}>
+                                            <label className="form-field">
+                                                <span>Оценка: {editForm.rating} / 10</span>
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="10"
+                                                    value={editForm.rating}
+                                                    onChange={e => setEditForm({ ...editForm, rating: +e.target.value })}
+                                                />
+                                            </label>
+                                            <label className="form-field">
+                                                <span>Комментарий</span>
+                                                <textarea
+                                                    required
+                                                    minLength={20}
+                                                    maxLength={1000}
+                                                    rows="3"
+                                                    value={editForm.comment}
+                                                    onChange={e => setEditForm({ ...editForm, comment: e.target.value })}
+                                                />
+                                                <small
+                                                    className={
+                                                        editForm.comment.length < 20 ? 'char-hint is-warn' : 'char-hint'
+                                                    }
+                                                >
+                                                    {editForm.comment.length < 20
+                                                        ? `Ещё ${20 - editForm.comment.length} символов до минимума (20)`
+                                                        : `${editForm.comment.length} / 1000`}
+                                                </small>
+                                            </label>
+                                            <div className="review-form-actions">
+                                                <button className="button button-dark button-small" disabled={pending}>
+                                                    {pending ? 'Сохраняем…' : 'Сохранить'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="button button-outline button-small"
+                                                    onClick={() => setEditingId(null)}
+                                                >
+                                                    Отмена
+                                                </button>
+                                            </div>
+                                        </form>
+                                    ) : (
+                                        <>
+                                            <p>{r.comment}</p>
+                                            {isOwn && (
+                                                <div className="review-actions">
+                                                    <button className="text-button" onClick={() => startEdit(r)}>
+                                                        <Pencil size={13} /> Изменить
+                                                    </button>
+                                                    <button
+                                                        className="text-button text-danger"
+                                                        onClick={() => removeReview(r.id)}
+                                                    >
+                                                        <Trash2 size={13} /> Удалить
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </article>
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="empty-review">
