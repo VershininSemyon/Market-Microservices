@@ -29,7 +29,7 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-import src.models
+import src.models  # noqa: F401
 from src.database import Base
 from src.redis_manager import RedisManager, redis_manager
 

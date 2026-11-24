@@ -9,6 +9,7 @@ import pytest
 
 import src.services as services_module
 from src.config import settings
+from src.enums import ReviewSortFieldEnum, SortOrderEnum
 from src.exceptions import (
     ProductNotFoundError,
     ReviewAlreadyExistsError,
@@ -18,6 +19,7 @@ from src.exceptions import (
 from src.schemas import (
     ReviewCreateSchema,
     ReviewListResponseSchema,
+    ReviewQueryParams,
     ReviewReadSchema,
     ReviewUpdateSchema,
 )
@@ -164,7 +166,7 @@ async def test_get_product_reviews_returns_cached_data(service, review_repo, ext
     )
     external.redis_cache.get_value.return_value = cached.model_dump_json()
 
-    result = await service.get_product_reviews(product_id)
+    result = await service.get_product_reviews(ReviewQueryParams(product_id=product_id))
 
     assert result.avg_rating == 8.0
     assert len(result.reviews) == 1
@@ -180,11 +182,17 @@ async def test_get_product_reviews_caches_result_on_miss(service, review_repo, e
     review_repo.get_reviews_by_product_id.return_value = [review]
     review_repo.get_product_avg_rating.return_value = 8.0
 
-    result = await service.get_product_reviews(product_id)
+    result = await service.get_product_reviews(ReviewQueryParams(product_id=product_id))
 
     assert result.avg_rating == 8.0
     assert len(result.reviews) == 1
-    review_repo.get_reviews_by_product_id.assert_awaited_once_with(product_id)
+    review_repo.get_reviews_by_product_id.assert_awaited_once_with(
+        product_id,
+        order_by=None,
+        order=SortOrderEnum.ASC,
+        limit=10,
+        offset=0,
+    )
     review_repo.get_product_avg_rating.assert_awaited_once_with(product_id)
     external.redis_cache.set_value.assert_awaited_once()
     key, value, ttl = external.redis_cache.set_value.call_args.args
@@ -193,11 +201,63 @@ async def test_get_product_reviews_caches_result_on_miss(service, review_repo, e
     assert json.loads(value)["avg_rating"] == 8.0
 
 
+async def test_get_product_reviews_passes_sorting_and_pagination_without_cache(
+    service,
+    review_repo,
+    external,
+) -> None:
+    product_id = uuid.uuid4()
+    review = make_review(product_id=product_id)
+    review_repo.get_reviews_by_product_id.return_value = [review]
+    review_repo.get_product_avg_rating.return_value = 8.0
+    filters = ReviewQueryParams(
+        product_id=product_id,
+        order_by=ReviewSortFieldEnum.RATING,
+        order=SortOrderEnum.DESC,
+        limit=5,
+        offset=2,
+    )
+
+    result = await service.get_product_reviews(filters)
+
+    assert len(result.reviews) == 1
+    review_repo.get_reviews_by_product_id.assert_awaited_once_with(
+        product_id,
+        order_by=ReviewSortFieldEnum.RATING,
+        order=SortOrderEnum.DESC,
+        limit=5,
+        offset=2,
+    )
+    external.redis_cache.get_value.assert_not_awaited()
+    external.redis_cache.set_value.assert_not_awaited()
+
+
+async def test_get_product_reviews_passes_date_sorting(service, review_repo, external) -> None:
+    product_id = uuid.uuid4()
+    review_repo.get_reviews_by_product_id.return_value = [make_review(product_id=product_id)]
+    review_repo.get_product_avg_rating.return_value = 8.0
+    filters = ReviewQueryParams(
+        product_id=product_id,
+        order_by=ReviewSortFieldEnum.CREATED_AT,
+        order=SortOrderEnum.ASC,
+    )
+
+    await service.get_product_reviews(filters)
+
+    review_repo.get_reviews_by_product_id.assert_awaited_once_with(
+        product_id,
+        order_by=ReviewSortFieldEnum.CREATED_AT,
+        order=SortOrderEnum.ASC,
+        limit=10,
+        offset=0,
+    )
+
+
 async def test_get_product_reviews_raises_when_product_not_found(service, external) -> None:
     external.check_product_exists.side_effect = ProductNotFoundError()
 
     with pytest.raises(ProductNotFoundError):
-        await service.get_product_reviews(uuid.uuid4())
+        await service.get_product_reviews(ReviewQueryParams(product_id=uuid.uuid4()))
 
     external.redis_cache.get_value.assert_not_awaited()
 

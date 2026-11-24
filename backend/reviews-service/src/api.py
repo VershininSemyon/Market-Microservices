@@ -1,10 +1,17 @@
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
 from src.dependencies import CurrentUserDep, ReviewServiceDep
-from src.schemas import ReviewCreateSchema, ReviewListResponseSchema, ReviewReadSchema, ReviewUpdateSchema
+from src.schemas import (
+    ReviewCreateSchema,
+    ReviewListResponseSchema,
+    ReviewQueryParams,
+    ReviewReadSchema,
+    ReviewUpdateSchema,
+)
 
 review_router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
@@ -28,10 +35,10 @@ async def create_review(
     status_code=status.HTTP_200_OK,
 )
 async def get_product_reviews(
-    product_id: UUID,
+    filters: Annotated[ReviewQueryParams, Depends()],
     review_service: ReviewServiceDep,
 ) -> ReviewListResponseSchema:
-    return await review_service.get_product_reviews(product_id)
+    return await review_service.get_product_reviews(filters)
 
 
 @review_router.get(

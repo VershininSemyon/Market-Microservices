@@ -5,6 +5,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.enums import ReviewSortFieldEnum, SortOrderEnum
+
 ReviewRating = Annotated[int, Field(ge=1, le=10)]
 ReviewComment = Annotated[str, Field(min_length=20, max_length=1000)]
 
@@ -34,3 +36,11 @@ class ReviewCreateSchema(BaseModel):
 class ReviewUpdateSchema(BaseModel):
     rating: ReviewRating
     comment: ReviewComment
+
+
+class ReviewQueryParams(BaseModel):
+    product_id: uuid.UUID
+    order_by: ReviewSortFieldEnum | None = None
+    order: SortOrderEnum = SortOrderEnum.ASC
+    limit: Annotated[int, Field(default=10, ge=1, le=100)]
+    offset: Annotated[int, Field(default=0, ge=0)]

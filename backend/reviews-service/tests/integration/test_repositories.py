@@ -1,6 +1,8 @@
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
+from src.enums import ReviewSortFieldEnum, SortOrderEnum
 from src.repositories import ReviewRepository
 
 COMMENT = "This is a very good product"
@@ -58,6 +60,77 @@ async def test_get_reviews_by_product_id(db_session) -> None:
 
     assert len(reviews) == 2
     assert all(review.product_id == product_id for review in reviews)
+
+
+async def test_get_reviews_by_product_id_sorts_by_rating(db_session) -> None:
+    repo = ReviewRepository(db_session)
+    product_id = uuid.uuid4()
+    await repo.create_review(make_data(product_id=product_id, rating=8))
+    await repo.create_review(make_data(product_id=product_id, rating=3))
+    await repo.create_review(make_data(product_id=product_id, rating=5))
+    await db_session.commit()
+
+    ascending = await repo.get_reviews_by_product_id(
+        product_id,
+        order_by=ReviewSortFieldEnum.RATING,
+        order=SortOrderEnum.ASC,
+    )
+    descending = await repo.get_reviews_by_product_id(
+        product_id,
+        order_by=ReviewSortFieldEnum.RATING,
+        order=SortOrderEnum.DESC,
+    )
+
+    assert [review.rating for review in ascending] == [3, 5, 8]
+    assert [review.rating for review in descending] == [8, 5, 3]
+
+
+async def test_get_reviews_by_product_id_sorts_by_date(db_session) -> None:
+    repo = ReviewRepository(db_session)
+    product_id = uuid.uuid4()
+    now = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
+    first = await repo.create_review(
+        make_data(product_id=product_id, created_at=now - timedelta(days=1))
+    )
+    second = await repo.create_review(
+        make_data(product_id=product_id, created_at=now)
+    )
+    third = await repo.create_review(
+        make_data(product_id=product_id, created_at=now + timedelta(days=1))
+    )
+    await db_session.commit()
+
+    ascending = await repo.get_reviews_by_product_id(
+        product_id,
+        order_by=ReviewSortFieldEnum.CREATED_AT,
+        order=SortOrderEnum.ASC,
+    )
+    descending = await repo.get_reviews_by_product_id(
+        product_id,
+        order_by=ReviewSortFieldEnum.CREATED_AT,
+        order=SortOrderEnum.DESC,
+    )
+
+    assert [review.id for review in ascending] == [first.id, second.id, third.id]
+    assert [review.id for review in descending] == [third.id, second.id, first.id]
+
+
+async def test_get_reviews_by_product_id_applies_pagination(db_session) -> None:
+    repo = ReviewRepository(db_session)
+    product_id = uuid.uuid4()
+    for rating in (1, 2, 3):
+        await repo.create_review(make_data(product_id=product_id, rating=rating))
+    await db_session.commit()
+
+    reviews = await repo.get_reviews_by_product_id(
+        product_id,
+        order_by=ReviewSortFieldEnum.RATING,
+        order=SortOrderEnum.ASC,
+        limit=1,
+        offset=1,
+    )
+
+    assert [review.rating for review in reviews] == [2]
 
 
 async def test_get_review_by_user_and_product(db_session) -> None:

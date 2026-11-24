@@ -2,11 +2,18 @@
 from datetime import date
 
 from src.config import settings
+from src.enums import SortOrderEnum
 from src.exceptions import ReviewAlreadyExistsError, ReviewNotFoundError, ReviewOwnershipError
 from src.producer import rabbitmq_producer
 from src.products_api_client import check_product_exists
 from src.redis_cache_backend import redis_cache
-from src.schemas import ReviewCreateSchema, ReviewListResponseSchema, ReviewReadSchema, ReviewUpdateSchema
+from src.schemas import (
+    ReviewCreateSchema,
+    ReviewListResponseSchema,
+    ReviewQueryParams,
+    ReviewReadSchema,
+    ReviewUpdateSchema,
+)
 from src.unitofwork import UnitOfWork
 
 
@@ -48,25 +55,42 @@ class ReviewService:
         )
         return ReviewReadSchema.model_validate(review)
 
-    async def get_product_reviews(self, product_id: str) -> ReviewListResponseSchema:
+    async def get_product_reviews(self, filters: ReviewQueryParams) -> ReviewListResponseSchema:
+        product_id = filters.product_id
         await check_product_exists(product_id)
 
-        cached = await redis_cache.get_value(f"reviews:{product_id}:list")
-        if cached is not None:
-            return ReviewListResponseSchema.model_validate_json(cached)
+        is_default_page = all([
+            filters.order_by is None,
+            filters.order == SortOrderEnum.ASC,
+            filters.limit == 10,
+            filters.offset == 0,
+        ])
+        cache_key = f"reviews:{product_id}:list"
+
+        if is_default_page:
+            cached = await redis_cache.get_value(cache_key)
+            if cached is not None:
+                return ReviewListResponseSchema.model_validate_json(cached)
 
         async with self.uow:
-            reviews = await self.uow.review_repo.get_reviews_by_product_id(product_id)
+            reviews = await self.uow.review_repo.get_reviews_by_product_id(
+                product_id,
+                order_by=filters.order_by,
+                order=filters.order,
+                limit=filters.limit,
+                offset=filters.offset,
+            )
             product_avg_rating = await self.uow.review_repo.get_product_avg_rating(product_id)
 
         reviews = [ReviewReadSchema.model_validate(review) for review in reviews]
         data = ReviewListResponseSchema(reviews=reviews, avg_rating=product_avg_rating)
 
-        await redis_cache.set_value(
-            f"reviews:{product_id}:list",
-            data.model_dump_json(),
-            3600 * 24 * 7 # неделя
-        )
+        if is_default_page:
+            await redis_cache.set_value(
+                cache_key,
+                data.model_dump_json(),
+                3600 * 24 * 7 # неделя
+            )
         return data
 
     async def get_review_by_id(self, review_id: str) -> ReviewReadSchema:

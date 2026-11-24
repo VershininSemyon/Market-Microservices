@@ -2,6 +2,7 @@
 import uuid
 from unittest.mock import AsyncMock
 
+from src.enums import ReviewSortFieldEnum, SortOrderEnum
 from src.exceptions import ReviewNotFoundError, ReviewOwnershipError
 from src.schemas import ReviewListResponseSchema, ReviewReadSchema
 
@@ -76,7 +77,97 @@ async def test_get_product_reviews(
     assert response.status_code == 200
     assert response.json()["avg_rating"] == 8.0
     assert response.json()["reviews"][0]["id"] == str(sample_review.id)
-    review_service.get_product_reviews.assert_awaited_once_with(sample_review.product_id)
+    filters = review_service.get_product_reviews.call_args.args[0]
+    assert filters.product_id == sample_review.product_id
+    assert filters.order_by is None
+    assert filters.order == SortOrderEnum.ASC
+    assert filters.limit == 10
+    assert filters.offset == 0
+
+
+async def test_get_product_reviews_passes_filters(
+    client,
+    review_service: AsyncMock,
+    sample_review: ReviewReadSchema,
+) -> None:
+    review_service.get_product_reviews.return_value = ReviewListResponseSchema(
+        reviews=[sample_review],
+        avg_rating=8.0,
+    )
+
+    response = await client.get(
+        "/reviews/",
+        params={
+            "product_id": str(sample_review.product_id),
+            "order_by": "rating",
+            "order": "desc",
+            "limit": 5,
+            "offset": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    filters = review_service.get_product_reviews.call_args.args[0]
+    assert filters.product_id == sample_review.product_id
+    assert filters.order_by == ReviewSortFieldEnum.RATING
+    assert filters.order == SortOrderEnum.DESC
+    assert filters.limit == 5
+    assert filters.offset == 2
+
+
+async def test_get_product_reviews_passes_date_sorting(
+    client,
+    review_service: AsyncMock,
+    sample_review: ReviewReadSchema,
+) -> None:
+    review_service.get_product_reviews.return_value = ReviewListResponseSchema(
+        reviews=[sample_review],
+        avg_rating=8.0,
+    )
+
+    response = await client.get(
+        "/reviews/",
+        params={
+            "product_id": str(sample_review.product_id),
+            "order_by": "created_at",
+            "order": "asc",
+        },
+    )
+
+    assert response.status_code == 200
+    filters = review_service.get_product_reviews.call_args.args[0]
+    assert filters.order_by == ReviewSortFieldEnum.CREATED_AT
+    assert filters.order == SortOrderEnum.ASC
+
+
+async def test_get_product_reviews_rejects_invalid_limit(client, review_service: AsyncMock) -> None:
+    response = await client.get(
+        "/reviews/",
+        params={"product_id": str(uuid.uuid4()), "limit": 0},
+    )
+
+    assert response.status_code == 422
+    review_service.get_product_reviews.assert_not_awaited()
+
+
+async def test_get_product_reviews_rejects_invalid_offset(client, review_service: AsyncMock) -> None:
+    response = await client.get(
+        "/reviews/",
+        params={"product_id": str(uuid.uuid4()), "offset": -1},
+    )
+
+    assert response.status_code == 422
+    review_service.get_product_reviews.assert_not_awaited()
+
+
+async def test_get_product_reviews_rejects_invalid_sort_field(client, review_service: AsyncMock) -> None:
+    response = await client.get(
+        "/reviews/",
+        params={"product_id": str(uuid.uuid4()), "order_by": "unknown"},
+    )
+
+    assert response.status_code == 422
+    review_service.get_product_reviews.assert_not_awaited()
 
 
 async def test_get_product_reviews_requires_product_id(client, review_service: AsyncMock) -> None:
