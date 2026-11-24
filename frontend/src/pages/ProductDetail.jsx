@@ -1,11 +1,33 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Star, Truck, ShieldCheck, ShoppingBag, Pencil, Trash2 } from 'lucide-react';
+import {
+    ArrowLeft,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Pencil,
+    ShieldCheck,
+    ShoppingBag,
+    SlidersHorizontal,
+    Star,
+    Trash2,
+    Truck
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { errorMessage } from '../config/api';
 import { productsApi, reviewsApi } from '../services/market';
 import { money, formatDate, productInitial, shortId, plural, toneClass } from '../shared';
+
+const REVIEWS_PAGE_SIZE = 10;
+
+const REVIEWS_SORT_OPTIONS = [
+    { value: '', label: 'По умолчанию' },
+    { value: 'created_at-desc', label: 'Дата: сначала новые' },
+    { value: 'created_at-asc', label: 'Дата: сначала старые' },
+    { value: 'rating-desc', label: 'Рейтинг: по убыванию' },
+    { value: 'rating-asc', label: 'Рейтинг: по возрастанию' }
+];
 
 export function ProductDetail({ add }) {
     const { id } = useParams();
@@ -14,6 +36,12 @@ export function ProductDetail({ add }) {
     const [reviews, setReviews] = useState({ reviews: [], avg_rating: 0 });
     const [busy, setBusy] = useState(true);
     const [error, setError] = useState('');
+    const [reviewsSort, setReviewsSort] = useState('');
+    const [reviewsOffset, setReviewsOffset] = useState(0);
+    const [reviewsHasNext, setReviewsHasNext] = useState(false);
+    const [reviewsBusy, setReviewsBusy] = useState(true);
+    const [reviewsError, setReviewsError] = useState('');
+    const [reviewsReloadKey, setReviewsReloadKey] = useState(0);
     const [rating, setRating] = useState(9);
     const [comment, setComment] = useState('');
     const [pending, setPending] = useState(false);
@@ -21,6 +49,13 @@ export function ProductDetail({ add }) {
     const [noticeKind, setNoticeKind] = useState('success');
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({ rating: 10, comment: '' });
+
+    const reviewsOrderBy = reviewsSort.startsWith('created_at')
+        ? 'created_at'
+        : reviewsSort.startsWith('rating')
+          ? 'rating'
+          : undefined;
+    const reviewsOrder = reviewsSort.endsWith('desc') ? 'desc' : 'asc';
 
     useEffect(() => {
         let ok = true;
@@ -31,18 +66,11 @@ export function ProductDetail({ add }) {
         setComment('');
         setRating(9);
         setProduct(null);
-        setReviews({ reviews: [], avg_rating: 0 });
+        setReviewsOffset(0);
 
-        Promise.all([
-            productsApi.get(id),
-            reviewsApi.list(id).catch(() => ({ reviews: [], avg_rating: 0 }))
-        ])
-            .then(([p, r]) => {
-                if (ok) {
-                    setProduct(p);
-                    setReviews(r);
-                }
-            })
+        productsApi
+            .get(id)
+            .then(p => ok && setProduct(p))
             .catch(e => ok && setError(errorMessage(e)))
             .finally(() => ok && setBusy(false));
 
@@ -51,18 +79,46 @@ export function ProductDetail({ add }) {
         };
     }, [id]);
 
+    useEffect(() => {
+        let alive = true;
+        setReviewsBusy(true);
+        setReviewsError('');
+
+        reviewsApi
+            .list(id, {
+                order_by: reviewsOrderBy,
+                order: reviewsOrder,
+                limit: REVIEWS_PAGE_SIZE + 1,
+                offset: reviewsOffset
+            })
+            .then(data => {
+                if (!alive) return;
+                const list = data.reviews || [];
+                setReviews({
+                    reviews: list.slice(0, REVIEWS_PAGE_SIZE),
+                    avg_rating: data.avg_rating || 0
+                });
+                setReviewsHasNext(list.length > REVIEWS_PAGE_SIZE);
+            })
+            .catch(e => {
+                if (!alive) return;
+                setReviewsError(errorMessage(e));
+                setReviews({ reviews: [], avg_rating: 0 });
+                setReviewsHasNext(false);
+            })
+            .finally(() => alive && setReviewsBusy(false));
+
+        return () => {
+            alive = false;
+        };
+    }, [id, reviewsOrderBy, reviewsOrder, reviewsOffset, reviewsReloadKey]);
+
     const showNotice = (text, kind = 'success') => {
         setNotice(text);
         setNoticeKind(kind);
     };
 
-    const refreshReviews = async () => {
-        try {
-            setReviews(await reviewsApi.list(id));
-        } catch (e) {
-            showNotice(errorMessage(e), 'error');
-        }
-    };
+    const refreshReviews = () => setReviewsReloadKey(v => v + 1);
 
     const submit = async e => {
         e.preventDefault();
@@ -72,7 +128,10 @@ export function ProductDetail({ add }) {
             setComment('');
             setRating(9);
             showNotice('Спасибо за отзыв!');
-            await refreshReviews();
+            // Показываем свежий отзыв первым, чтобы он точно попал на текущую страницу.
+            setReviewsSort('created_at-desc');
+            setReviewsOffset(0);
+            refreshReviews();
         } catch (e) {
             showNotice(errorMessage(e), 'error');
         } finally {
@@ -93,7 +152,7 @@ export function ProductDetail({ add }) {
             await reviewsApi.update(editingId, editForm);
             setEditingId(null);
             showNotice('Отзыв обновлён');
-            await refreshReviews();
+            refreshReviews();
         } catch (e) {
             showNotice(errorMessage(e), 'error');
         } finally {
@@ -103,11 +162,16 @@ export function ProductDetail({ add }) {
 
     const removeReview = async reviewId => {
         if (!window.confirm('Удалить отзыв?')) return;
+        const wasLastOnPage = (reviews.reviews || []).length === 1;
         try {
             await reviewsApi.remove(reviewId);
             if (editingId === reviewId) setEditingId(null);
             showNotice('Отзыв удалён');
-            await refreshReviews();
+            // Если страница опустела, возвращаемся на предыдущую.
+            if (wasLastOnPage && reviewsOffset > 0) {
+                setReviewsOffset(Math.max(0, reviewsOffset - REVIEWS_PAGE_SIZE));
+            }
+            refreshReviews();
         } catch (e) {
             showNotice(errorMessage(e), 'error');
         }
@@ -178,10 +242,16 @@ export function ProductDetail({ add }) {
                     <h1>{product.name}</h1>
                     <div className="detail-rating">
                         <Star size={16} fill="currentColor" />
-                        {reviews.avg_rating ? Number(reviews.avg_rating).toFixed(1) : 'Новый товар'}
-                        <span>
-                            · {reviewList.length} {plural(reviewList.length, 'отзыв', 'отзыва', 'отзывов')}
-                        </span>
+                        {reviewsBusy && !reviewList.length
+                            ? '…'
+                            : reviews.avg_rating
+                              ? Number(reviews.avg_rating).toFixed(1)
+                              : 'Новый товар'}
+                        {!reviewsBusy && !reviewsHasNext && reviewsOffset === 0 && reviewList.length > 0 && (
+                            <span>
+                                · {reviewList.length} {plural(reviewList.length, 'отзыв', 'отзыва', 'отзывов')}
+                            </span>
+                        )}
                     </div>
                     <div className="detail-price">{money(product.price)}</div>
                     <p className="detail-description">
@@ -228,7 +298,10 @@ export function ProductDetail({ add }) {
                         </h2>
                     </div>
                     <div className="review-average">
-                        <Star size={15} fill="currentColor" /> {Number(reviews.avg_rating || 0).toFixed(1)} / 10
+                        <Star size={15} fill="currentColor" />{' '}
+                        {reviewsBusy && !reviewList.length
+                            ? '…'
+                            : `${Number(reviews.avg_rating || 0).toFixed(1)} / 10`}
                     </div>
                 </div>
 
@@ -281,7 +354,38 @@ export function ProductDetail({ add }) {
                     </form>
                 )}
 
-                {reviewList.length ? (
+                <div className="reviews-toolbar">
+                    <label className="sort-select">
+                        <SlidersHorizontal size={15} />
+                        <select
+                            value={reviewsSort}
+                            onChange={e => {
+                                setReviewsSort(e.target.value);
+                                setReviewsOffset(0);
+                            }}
+                            aria-label="Сортировка отзывов"
+                        >
+                            {REVIEWS_SORT_OPTIONS.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                        <ChevronDown size={14} />
+                    </label>
+                </div>
+
+                {reviewsError ? (
+                    <div className="error-panel">
+                        <p>Не удалось загрузить отзывы.</p>
+                        <small>{reviewsError}</small>
+                        <button className="button button-outline" onClick={refreshReviews}>
+                            Повторить
+                        </button>
+                    </div>
+                ) : reviewsBusy && !reviewList.length ? (
+                    <div className="loading-line">Загружаем отзывы…</div>
+                ) : reviewList.length ? (
                     <div className="reviews-list">
                         {reviewList.map(r => {
                             const isOwn = user?.id === r.user_id;
@@ -373,6 +477,26 @@ export function ProductDetail({ add }) {
                         {user
                             ? 'Станьте первым, кто поделится впечатлением!'
                             : 'Войдите, чтобы оставить первый отзыв.'}
+                    </div>
+                )}
+
+                {!reviewsError && reviewList.length > 0 && (
+                    <div className="pagination">
+                        <button
+                            className="button button-outline"
+                            disabled={reviewsBusy || reviewsOffset === 0}
+                            onClick={() => setReviewsOffset(Math.max(0, reviewsOffset - REVIEWS_PAGE_SIZE))}
+                        >
+                            <ChevronLeft size={16} /> Назад
+                        </button>
+                        <span>Страница {Math.floor(reviewsOffset / REVIEWS_PAGE_SIZE) + 1}</span>
+                        <button
+                            className="button button-outline"
+                            disabled={reviewsBusy || !reviewsHasNext}
+                            onClick={() => setReviewsOffset(reviewsOffset + REVIEWS_PAGE_SIZE)}
+                        >
+                            Дальше <ChevronRight size={16} />
+                        </button>
                     </div>
                 )}
             </section>

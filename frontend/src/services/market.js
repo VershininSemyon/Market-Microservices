@@ -15,7 +15,8 @@ export const ordersApi = {
 };
 
 export const reviewsApi = {
-    list: product_id => api.get('/reviews/', { params: { product_id } }).then(r => r.data),
+    list: (product_id, params = {}) =>
+        api.get('/reviews/', { params: { product_id, ...params } }).then(r => r.data),
     create: data => api.post('/reviews/', data).then(r => r.data),
     update: (id, data) => api.put(`/reviews/${id}`, data).then(r => r.data),
     remove: id => api.delete(`/reviews/${id}`)

@@ -1124,6 +1124,7 @@ img { display: block; max-width: 100%; }
 
 .reviews-section { padding-top: 64px; }
 .reviews-section .section-heading { margin-bottom: 22px; }
+.reviews-toolbar { display: flex; justify-content: flex-end; margin-bottom: 18px; }
 .review-average { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--amber-ink); }
 .review-form { max-width: 680px; margin-bottom: 24px; }
 .review-form, .profile-form {
