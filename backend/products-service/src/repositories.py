@@ -1,4 +1,6 @@
 
+from uuid import UUID
+
 from sqlalchemy import and_, asc, desc, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,6 +56,14 @@ class ProductRepository:
         ))
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def get_active_products_by_ids(self, product_ids: list[UUID]) -> list[ProductORM]:
+        stmt = select(ProductORM).where(and_(
+            ProductORM.is_active,
+            ProductORM.id.in_(product_ids)
+        ))
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
 
     async def create_product(self, data: dict) -> ProductORM:
         stmt = insert(ProductORM).values(**data).returning(ProductORM)

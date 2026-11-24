@@ -108,6 +108,17 @@ async def test_list_products_applies_pagination(db_session) -> None:
     assert [product.name for product in products] == ["product-1"]
 
 
+async def test_get_active_products_by_ids_returns_only_active(db_session) -> None:
+    repo = ProductRepository(db_session)
+    active = await repo.create_product(make_data(name="active"))
+    inactive = await repo.create_product(make_data(name="inactive", is_active=False))
+    await db_session.commit()
+
+    products = await repo.get_active_products_by_ids([active.id, inactive.id, uuid.uuid4()])
+
+    assert [product.id for product in products] == [active.id]
+
+
 async def test_get_product_by_id_returns_active_product(db_session) -> None:
     repo = ProductRepository(db_session)
     created = await repo.create_product(make_data())

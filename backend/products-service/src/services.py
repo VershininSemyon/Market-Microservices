@@ -1,14 +1,26 @@
 
+import asyncio
 import json
 from datetime import date
 from uuid import UUID
 
 from src.config import settings
 from src.enums import SortOrderEnum
-from src.exceptions import ProductAlreadyExistsError, ProductNotFoundError
+from src.exceptions import (
+    DuplicateProductIdError,
+    NotEnoughProductQuantityError,
+    ProductAlreadyExistsError,
+    ProductNotFoundError,
+)
 from src.producer import rabbitmq_producer
-from src.redis_cache_backend import redis_cache
-from src.schemas import ProductCreateSchema, ProductQueryParams, ProductReadSchema, ProductUpdateSchema
+from src.redis_cache_backend import get_lock_key, redis_cache
+from src.schemas import (
+    LockProductSchema,
+    ProductCreateSchema,
+    ProductQueryParams,
+    ProductReadSchema,
+    ProductUpdateSchema,
+)
 from src.search import delete_product_index, index_product, search_product
 from src.unitofwork import UnitOfWork
 
@@ -21,6 +33,68 @@ class ProductService:
         await redis_cache.del_key("products:list")
         if product_id is not None:
             await redis_cache.del_key(f"products:{product_id}")
+
+    async def _reserve_product(self, product_id: UUID, quantity: int, db_quantity: int) -> bool:
+        new_lock = await redis_cache.incrby(get_lock_key(product_id), quantity)
+        if db_quantity - new_lock >= 0:
+            return True
+
+        await redis_cache.decrby(get_lock_key(product_id), quantity)
+        return False
+
+    async def lock_products(self, items: list[LockProductSchema]) -> None:
+        product_ids = [item.product_id for item in items]
+
+        if len(product_ids) != len(set(product_ids)):
+            raise DuplicateProductIdError()
+
+        async with self.uow:
+            products = await self.uow.product_repo.get_active_products_by_ids(product_ids)
+
+        db_quantities = {product.id: product.quantity for product in products}
+
+        if len(db_quantities) != len(product_ids):
+            raise ProductNotFoundError()
+
+        results = await asyncio.gather(
+            *(
+                self._reserve_product(item.product_id, item.quantity, db_quantities[item.product_id])
+                for item in items
+            ),
+            return_exceptions=True,
+        )
+
+        redis_error: BaseException | None = None
+        failed = False
+
+        for result in results:
+            if isinstance(result, BaseException):
+                failed = True
+                if redis_error is None:
+                    redis_error = result
+            elif result is False:
+                failed = True
+
+        if not failed:
+            return
+
+        for item, result in zip(items, results):
+            if result is True:
+                await redis_cache.decrby(get_lock_key(item.product_id), item.quantity)
+
+        if redis_error is not None:
+            raise redis_error
+
+        raise NotEnoughProductQuantityError()
+
+    async def unlock_products(self, items: list[LockProductSchema]) -> None:
+        product_ids = [item.product_id for item in items]
+
+        if len(product_ids) != len(set(product_ids)):
+            raise DuplicateProductIdError()
+
+        for item in items:
+            await redis_cache.release_lock(get_lock_key(item.product_id), item.quantity)
 
     async def create_product(self, data: ProductCreateSchema, user_email: str) -> ProductReadSchema:
         async with self.uow:

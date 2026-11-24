@@ -71,9 +71,15 @@ def service(uow: FakeUnitOfWork) -> OrderService:
 
 @pytest.fixture(autouse=True)
 def external(monkeypatch) -> SimpleNamespace:
-    mocks = SimpleNamespace(get_product=AsyncMock())
+    mocks = SimpleNamespace(
+        get_product=AsyncMock(),
+        lock_products=AsyncMock(),
+        unlock_products=AsyncMock(),
+    )
 
     monkeypatch.setattr(services_module, "get_product", mocks.get_product)
+    monkeypatch.setattr(services_module, "lock_products", mocks.lock_products)
+    monkeypatch.setattr(services_module, "unlock_products", mocks.unlock_products)
 
     return mocks
 
@@ -159,6 +165,8 @@ async def test_create_order_success(service, uow, order_repo, outbox_repo, exter
 
     assert result.id == order.id
     assert external.get_product.await_count == 2
+    external.lock_products.assert_awaited_once_with(data.products)
+    external.unlock_products.assert_not_awaited()
 
     created_order = order_repo.create_order.call_args.args[0]
     assert created_order["user_id"] == user_id
@@ -235,3 +243,107 @@ async def test_create_order_raises_when_product_not_found(
     order_repo.create_order.assert_not_awaited()
     outbox_repo.create_outbox_event.assert_not_awaited()
     uow.commit.assert_not_awaited()
+
+
+async def test_create_order_locks_products_before_creating_order(
+    service,
+    order_repo,
+    external,
+) -> None:
+    events = []
+    product_id = uuid.uuid4()
+    data = OrderCreateSchema(products={product_id: 1})
+
+    async def fake_get_product(requested_id):
+        events.append("get_product")
+        return {
+            "id": str(requested_id),
+            "name": "apple",
+            "price": 10.0,
+            "quantity": 5,
+        }
+
+    async def fake_lock_products(products):
+        events.append("lock_products")
+
+    async def fake_create_order(*args, **kwargs):
+        events.append("create_order")
+        return make_order()
+
+    external.get_product.side_effect = fake_get_product
+    external.lock_products.side_effect = fake_lock_products
+    order_repo.create_order.side_effect = fake_create_order
+
+    await service.create_order(uuid.uuid4(), "alice@example.com", data)
+
+    assert events == ["get_product", "lock_products", "create_order"]
+    external.lock_products.assert_awaited_once_with(data.products)
+    external.unlock_products.assert_not_awaited()
+
+
+async def test_create_order_unlocks_when_commit_fails(
+    service,
+    uow,
+    order_repo,
+    external,
+) -> None:
+    product_id = uuid.uuid4()
+    external.get_product.return_value = {
+        "id": str(product_id),
+        "name": "apple",
+        "price": 10.0,
+        "quantity": 5,
+    }
+    order_repo.create_order.return_value = make_order()
+    uow.commit.side_effect = RuntimeError("commit failed")
+    data = OrderCreateSchema(products={product_id: 1})
+
+    with pytest.raises(RuntimeError):
+        await service.create_order(uuid.uuid4(), "alice@example.com", data)
+
+    external.unlock_products.assert_awaited_once_with(data.products)
+
+
+async def test_create_order_unlocks_when_order_creation_fails(
+    service,
+    order_repo,
+    external,
+) -> None:
+    product_id = uuid.uuid4()
+    external.get_product.return_value = {
+        "id": str(product_id),
+        "name": "apple",
+        "price": 10.0,
+        "quantity": 5,
+    }
+    order_repo.create_order.side_effect = RuntimeError("db failed")
+    data = OrderCreateSchema(products={product_id: 1})
+
+    with pytest.raises(RuntimeError):
+        await service.create_order(uuid.uuid4(), "alice@example.com", data)
+
+    external.unlock_products.assert_awaited_once_with(data.products)
+
+
+async def test_create_order_does_not_unlock_when_lock_fails(
+    service,
+    order_repo,
+    outbox_repo,
+    external,
+) -> None:
+    product_id = uuid.uuid4()
+    external.get_product.return_value = {
+        "id": str(product_id),
+        "name": "apple",
+        "price": 10.0,
+        "quantity": 5,
+    }
+    external.lock_products.side_effect = NotEnoughProductQuantityError()
+    data = OrderCreateSchema(products={product_id: 1})
+
+    with pytest.raises(NotEnoughProductQuantityError):
+        await service.create_order(uuid.uuid4(), "alice@example.com", data)
+
+    order_repo.create_order.assert_not_awaited()
+    outbox_repo.create_outbox_event.assert_not_awaited()
+    external.unlock_products.assert_not_awaited()

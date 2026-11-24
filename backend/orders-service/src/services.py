@@ -6,7 +6,7 @@ from datetime import date
 from src.config import settings
 from src.exceptions import NotEnoughProductQuantityError, OrderNotFoundError, OrderOwnershipError
 from src.models import ExchangeTypeEnum
-from src.products_api_client import get_product
+from src.products_api_client import get_product, lock_products, unlock_products
 from src.schemas import OrderCreateSchema, OrderReadSchema
 from src.unitofwork import UnitOfWork
 
@@ -56,38 +56,44 @@ class OrderService:
             total_price += product["price"] * quantity
             total_amount += quantity
 
-        async with self.uow:
-            order = await self.uow.order_repo.create_order(
-                {
-                    "user_id": user_id,
-                    "products": products,
-                    "total_price": total_price,
-                    "total_amount": total_amount
+        await lock_products(data.products)
+
+        try:
+            async with self.uow:
+                order = await self.uow.order_repo.create_order(
+                    {
+                        "user_id": user_id,
+                        "products": products,
+                        "total_price": total_price,
+                        "total_amount": total_amount
+                    }
+                )
+
+                event_data = {
+                    "exchange_name": settings.ORDERS_EVENTS_EXCHANGE_NAME,
+                    "exchange_type": ExchangeTypeEnum.TOPIC,
+                    "routing_key": settings.ORDER_CREATED_ROUTING_KEY,
+                    "event_payload": {
+                        "event_id": str(uuid.uuid4()),
+                        "total_amount": total_amount,
+                        "total_price": total_price,
+                        "products": [
+                            {
+                                "id": str(prod_id),
+                                "quantity": prod_data["quantity"]
+                            }
+                            for prod_id, prod_data in products.items()
+                        ],
+                        "event_date": str(date.today()),
+                        "user_email": user_email
+                    }
                 }
-            )
 
-            event_data = {
-                "exchange_name": settings.ORDERS_EVENTS_EXCHANGE_NAME,
-                "exchange_type": ExchangeTypeEnum.TOPIC,
-                "routing_key": settings.ORDER_CREATED_ROUTING_KEY,
-                "event_payload": {
-                    "event_id": str(uuid.uuid4()),
-                    "total_amount": total_amount,
-                    "total_price": total_price,
-                    "products": [
-                        {
-                            "id": str(prod_id),
-                            "quantity": prod_data["quantity"]
-                        }
-                        for prod_id, prod_data in products.items()
-                    ],
-                    "event_date": str(date.today()),
-                    "user_email": user_email
-                }
-            }
+                await self.uow.outbox_repo.create_outbox_event(event_data)
 
-            await self.uow.outbox_repo.create_outbox_event(event_data)
-
-            await self.uow.commit()
+                await self.uow.commit()
+        except Exception:
+            await unlock_products(data.products)
+            raise
 
         return OrderReadSchema.model_validate(order)

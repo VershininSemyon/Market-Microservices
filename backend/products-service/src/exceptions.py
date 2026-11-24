@@ -18,3 +18,13 @@ class ProductNotFoundError(ProductError):
 class ProductAlreadyExistsError(ProductError):
     status_code: int = 409
     detail: str = "Продукт с таким названием уже существует"
+
+
+class DuplicateProductIdError(ProductError):
+    status_code: int = 400
+    detail: str = "Идентификаторы товаров не должны повторяться"
+
+
+class NotEnoughProductQuantityError(ProductError):
+    status_code: int = 409
+    detail: str = "Недостаточно товара на складе"

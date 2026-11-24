@@ -7,7 +7,7 @@ import aio_pika
 
 from src.config import settings
 from src.database import async_session_factory
-from src.redis_cache_backend import redis_cache
+from src.redis_cache_backend import get_lock_key, redis_cache
 from src.redis_manager import redis_manager
 from src.services import ProductService
 from src.unitofwork import UnitOfWork
@@ -47,6 +47,11 @@ class RabbitMQConsumer:
         async with uow:
             await uow.product_repo.change_product_quantity(product_id, -quantity)
             await uow.commit()
+
+        try:
+            await redis_cache.release_lock(get_lock_key(product_id), quantity)
+        except Exception as e:
+            logger.error(f"Не удалось уменьшить резерв товара {product_id}: {e}")
 
         await product_service.invalidate_products_cache(product_id)
 

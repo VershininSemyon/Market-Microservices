@@ -108,3 +108,61 @@ async def test_cache_del_key() -> None:
     await cache.del_key("key")
 
     fake_client.delete.assert_awaited_once_with("key")
+
+
+async def test_cache_incrby() -> None:
+    fake_client = AsyncMock()
+    fake_client.incrby.return_value = 5
+    redis_manager._client = fake_client
+    cache = RedisCacheBackend()
+
+    result = await cache.incrby("key", 2)
+
+    assert result == 5
+    fake_client.incrby.assert_awaited_once_with("key", 2)
+
+
+async def test_cache_decrby() -> None:
+    fake_client = AsyncMock()
+    fake_client.decrby.return_value = 3
+    redis_manager._client = fake_client
+    cache = RedisCacheBackend()
+
+    result = await cache.decrby("key", 2)
+
+    assert result == 3
+    fake_client.decrby.assert_awaited_once_with("key", 2)
+
+
+async def test_release_lock_keeps_positive_key() -> None:
+    fake_client = AsyncMock()
+    fake_client.decrby.return_value = 4
+    redis_manager._client = fake_client
+    cache = RedisCacheBackend()
+
+    await cache.release_lock("key", 2)
+
+    fake_client.decrby.assert_awaited_once_with("key", 2)
+    fake_client.delete.assert_not_awaited()
+
+
+async def test_release_lock_deletes_key_on_zero() -> None:
+    fake_client = AsyncMock()
+    fake_client.decrby.return_value = 0
+    redis_manager._client = fake_client
+    cache = RedisCacheBackend()
+
+    await cache.release_lock("key", 2)
+
+    fake_client.delete.assert_awaited_once_with("key")
+
+
+async def test_release_lock_deletes_key_below_zero() -> None:
+    fake_client = AsyncMock()
+    fake_client.decrby.return_value = -3
+    redis_manager._client = fake_client
+    cache = RedisCacheBackend()
+
+    await cache.release_lock("key", 5)
+
+    fake_client.delete.assert_awaited_once_with("key")

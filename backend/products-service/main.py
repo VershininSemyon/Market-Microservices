@@ -12,6 +12,7 @@ from src.api import product_router
 from src.config import settings
 from src.database import engine
 from src.exceptions import ProductError
+from src.internal_api import internal_product_router
 from src.producer import rabbitmq_producer
 from src.redis_manager import redis_manager
 from src.search import create_products_index
@@ -46,6 +47,7 @@ if settings.CORS_ORIGINS:
     )
 
 app.include_router(product_router)
+app.include_router(internal_product_router)
 
 Instrumentator().instrument(app).expose(app)
 

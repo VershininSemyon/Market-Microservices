@@ -39,6 +39,15 @@ class ProductUpdateSchema(BaseModel):
     quantity: ProductQuantity
 
 
+class LockProductSchema(BaseModel):
+    product_id: uuid.UUID
+    quantity: Annotated[int, Field(gt=0)]
+
+
+class LockProductsResponseSchema(BaseModel):
+    success: bool
+
+
 class ProductQueryParams(BaseModel):
     text_query: str | None = None
     min_price: float | None = Field(default=None, ge=0)
