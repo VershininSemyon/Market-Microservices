@@ -2,7 +2,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import CheckConstraint, Date, Enum, Integer, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, Enum, Index, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
@@ -20,5 +20,6 @@ class DayAnalyticsORM(Base):
 
     __table_args__ = (
         UniqueConstraint("entity_type", "event_type", "occurred_at", name="unique_entity_event_occurred"),
-        CheckConstraint("count > 0", name="check_count_positive")
+        CheckConstraint("count > 0", name="check_count_positive"),
+        Index("ix_day_analytics_occurred_at", "occurred_at", postgresql_using="btree"),
     )

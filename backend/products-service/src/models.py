@@ -29,4 +29,10 @@ class ProductORM(Base):
             unique=True,
             postgresql_where="is_active = true"
         ),
+        Index(
+            "ix_products_price_active",
+            "price",
+            postgresql_where="is_active = true",
+            postgresql_using="btree",
+        ),
     )

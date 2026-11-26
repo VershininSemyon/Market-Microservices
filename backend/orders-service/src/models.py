@@ -3,7 +3,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, Float, Integer, Text, func
+from sqlalchemy import CheckConstraint, DateTime, Enum, Float, Index, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,7 +28,8 @@ class OrderORM(Base):
 
     __table_args__ = (
         CheckConstraint("total_price > 0", name="check_total_price_positive"),
-        CheckConstraint("total_amount >= 0", name="check_total_amount_non_negative")
+        CheckConstraint("total_amount >= 0", name="check_total_amount_non_negative"),
+        Index("ix_orders_user_id", "user_id", postgresql_using="btree"),
     )
 
 
@@ -41,3 +42,7 @@ class OutboxEventORM(Base):
     routing_key: Mapped[str] = mapped_column(Text, nullable=False)
     event_payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_outbox_events_created_at", "created_at", postgresql_using="btree"),
+    )

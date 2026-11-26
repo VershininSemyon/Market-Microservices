@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Integer, Text, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, Index, Integer, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
@@ -21,5 +21,17 @@ class ReviewORM(Base):
     __table_args__ = (
         CheckConstraint("rating >= 1 AND rating <= 10", name="check_rating_value"),
         CheckConstraint("length(comment) >= 20 AND length(comment) <= 1000", name="check_comment_length"),
-        UniqueConstraint("user_id", "product_id", name="unique_user_product")
+        UniqueConstraint("user_id", "product_id", name="unique_user_product"),
+        Index(
+            "ix_reviews_product_id_created_at",
+            "product_id",
+            "created_at",
+            postgresql_using="btree",
+        ),
+        Index(
+            "ix_reviews_product_id_rating",
+            "product_id",
+            "rating",
+            postgresql_using="btree",
+        ),
     )
